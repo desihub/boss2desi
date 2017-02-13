@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+
+import fitsio
+import argparse
+import numpy as np
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    
+    parser.add_argument("--boss-std-stars",type=str,default=None,required=True,help="boss standard-star template file")
+    parser.add_argument("--outfile",type=str,default=None,required=True,help="output file")
+
+    args = parser.parse_args()
+
+    h = fitsio.FITS(args.boss_std_stars)
+
+    hdr={}
+    ## pad with 0s to get cover the u filter and the z filter
+    LAMBDA_u = 2900.
+    npad_u = int((h[0].read_header()["CRVAL1"]-LAMBDA_u)/h[0].read_header()["CD1_1"])
+    LAMBDA_z = 11200.
+    nlam = h[0].read().shape[1]
+    dlam = h[0].read_header()["CD1_1"]
+    npad_z = int((LAMBDA_z-h[0].read_header()["CRVAL1"]-nlam*dlam)/h[0].read_header()["CD1_1"])
+    data = h[0].read()
+    flux = np.zeros([data.shape[0],npad_u+npad_z+nlam])
+    flux[:,npad_u:npad_u+nlam]=data
+    hdr["CRPIX1"] = h[0].read_header()["CRPIX1"]
+    hdr["CRVAL1"] = LAMBDA_u
+    hdr["CDELT1"] = h[0].read_header()["CD1_1"]
+    hdr["LOGLAM"] = 0
+
+    out = fitsio.FITS(args.outfile,'rw',clobber=True)
+    out.write(flux,header=hdr,extname="")
+    
+    templateid = np.arange(h[0].read().shape[0])
+    teff = h[1]["TEFF"][:]
+    logg = h[1]["G"][:]
+    feh  = h[1]["FEH"][:]
+
+    out.write([templateid,teff,logg,feh],names=["TEMPLATEID","TEFF","LOGG","FEH"])
+    out.close()

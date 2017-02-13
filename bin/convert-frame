@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+from boss2desi import frame2brick
+import fitsio
+import argparse
+
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    
+    parser.add_argument("--frame",type=str,default=None,required=True,help="frame file")
+    parser.add_argument("--cframe",type=str,default=None,required=True,help="cframe file. Required to read the wavelength solution of the frame.")
+    parser.add_argument("--wave",type=str,default=None,required=True,help="wavelength will be read from hdu[3] of this file.")
+    parser.add_argument("--lambda-min",type=float,default=3000,required=False,help="minimum wavelength")
+    parser.add_argument("--lambda-max",type=float,default=10000,required=False,help="maximum wavelength")
+    parser.add_argument("--out",type=str,default=None,required=True,help="output file")
+
+    args=parser.parse_args()
+
+    frame=fitsio.FITS(args.frame)
+    flux = frame[0].read()
+    ivar = frame[1].read()
+    mask = frame[2].read()
+    sky  = frame[6].read()
+    camera = frame[0].read_header()["CAMERAS"]
+    fibermap = frame[5]
+
+    ## read wdisp and wavelenghts and wdisp from cframe
+    cframe=fitsio.FITS(args.cframe)
+    wave = 10**cframe[3].read()[:,:flux.shape[1]]
+    wave_wdisp = wave
+    wdisp= cframe[4].read()[:,:flux.shape[1]]
+
+
+    ## interpolate into fiber 250 from flat-field wavelengths
+    wave_new = fitsio.FITS(args.wave)
+    wave_new = 10**wave_new[3].read()[249,:]
+    ## wavelength cuts:
+    w = (wave_new > args.lambda_min) & (wave_new < args.lambda_max)
+    wave_new = wave_new[w]
+
+    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap,sky=sky,wave_wdisp=wave_wdisp)
+
+    b.export(args.out)
+
+
+    

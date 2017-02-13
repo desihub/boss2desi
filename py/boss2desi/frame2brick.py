@@ -16,36 +16,20 @@ class brick:
         if not sky is None:
             fl+=sky
         nspec = fl.shape[0]
-        nbins = fl.shape[1]
+        nbins = len(wave_new)
         lam = wave_new
         flux = sp.zeros([nspec,nbins])
         ivar = sp.zeros([nspec,nbins])
         mask = sp.zeros([nspec,nbins],dtype=sp.uint32)
         re = sp.zeros([nspec,self.ndiag,nbins])
 
-        fm_names = fibermap.get_colnames()
-        fm = []
-        for i in fm_names:
-            fm.append(fibermap[i][:])
-
-        fm_names.append("FIBER")
-        fm.append(sp.arange(nspec,dtype=int))
-
-        fm_names.append("FILTER")
-        fm.append(sp.array([["SDSS_U","SDSS_G","SDSS_R","SDSS_I","SDSS_Z"]]*nspec))
-
-        self.fm_names = fm_names
-        self.fm = fm
-        for i,obj in enumerate(fm[fm_names.index("OBJTYPE")]):
-            fm[fm_names.index("OBJTYPE")][i] = obj.replace("SPECTROPHOTO_STD","STD")
-
-
+        self.read_fibermap(fibermap)
         for i in range(nspec):
             j = sp.searchsorted(la[i,:],lam)
             w=j>=len(la[i,:])
             j[w]-=1
             flux[i,:] = (la[i,j]-lam)*fl[i,j-1]*iv[i,j-1] + (lam-la[i,j-1])*fl[i,j]*iv[i,j]
-            mask[i,:] = ma[i,j-1]+ma[i,j]
+            mask[i,:] = ma[i,j-1] & ma[i,j]
             norm = (la[i,j]-lam)*iv[i,j-1] + (lam-la[i,j-1])*iv[i,j]
             ivar[i,:] = norm**2
 
@@ -53,7 +37,7 @@ class brick:
             w=norm_ivar>0
             ivar[i,w]/=norm_ivar[w]
 
-            w=(iv[i-1]==0) | (iv[i]==0)
+            w=(iv[i,j-1]==0) | (iv[i,j]==0)
             norm[w]=0
             flux[i,w]=0
             ivar[i,w]=0
@@ -71,6 +55,44 @@ class brick:
         self.ivar = ivar
         self.mask = mask
         self.re = re
+    
+    def read_fibermap(self,fibermap):
+        ## get fibermap names
+        fm_names = fibermap.get_colnames()
+        nspec = len(fibermap[fm_names[0]][:])
+        ## create a fiber map and add all columns from boss' fibermap
+        fm = []
+        for i in fm_names:
+            fm.append(fibermap[i][:])
+
+        ## add fiber number
+        fm_names.append("FIBER")
+        fib_num = sp.arange(nspec,dtype=int)+1
+        if self.camera == 'b2' or self.camera == 'r2':
+            fib_num += 500
+        fm.append(fib_num)
+
+        ## add filter names
+        fm_names.append("FILTER")
+        fm.append(sp.array([["SDSS_U","SDSS_G","SDSS_R","SDSS_I","SDSS_Z"]]*nspec))
+
+        ## correct magnitudes
+        for i,obj in enumerate(fm[fm_names.index('MAG')]):
+            ## avoid NA and SKY
+            ## sky fibers don't have magnitudes
+            if fm[fm_names.index('OBJTYPE')][i].strip() != 'SKY'\
+                    and fm[fm_names.index('OBJTYPE')][i].strip() != 'NA':
+                ## fix only positive fluxes...
+                w = fm[fm_names.index('CALIBFLUX')][i] > 0
+                fm[fm_names.index("MAG")][i][w] = \
+                        22.5-2.5*sp.log10(fm[fm_names.index('CALIBFLUX')][i][w])
+
+        ## change names of standard stars to desi convention
+        for i,obj in enumerate(fm[fm_names.index("OBJTYPE")]):
+            fm[fm_names.index("OBJTYPE")][i] = obj.replace("SPECTROPHOTO_STD","STD")
+
+        self.fm_names = fm_names
+        self.fm = fm
 
     def export(self,fout="brick.fits.gz"):
         hlist=[]

@@ -22,7 +22,7 @@ class boss_fibermap:
 
         ## add channel
         fm_names.append("CHANNEL")
-        fm.append([camera]*nspec)
+        fm.append(sp.array([camera]*nspec))
 
         ## add filter names
         fm_names.append("FILTER")
@@ -37,11 +37,11 @@ class boss_fibermap:
             targetid = []
             for f in fib_num:
                 targetid.append(thid_map[f])
-            fm.append(targetid)
+            fm.append(sp.array(targetid))
 
         if plate is not None:
             fm_names.append("BRICKNAME")
-            fm.append([plate]*nspec)
+            fm.append(sp.array([plate]*nspec))
 
         ## correct magnitudes
         for i,obj in enumerate(fm[fm_names.index('MAG')]):

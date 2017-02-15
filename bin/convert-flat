@@ -11,7 +11,6 @@ if __name__=="__main__":
     parser.add_argument("--flat",type=str,default=None,required=True,help="flat file")
     parser.add_argument("--cframe",type=str,default=None,required=True,help="cframe file. Required to read the wavelength solution of the flat and wdisp.")
     parser.add_argument("--out",type=str,default=None,required=True,help="output file")
-    parser.add_argument("--camera",type=str,default=None,required=True,help="the camera [b1 r1 b2 or r2]")
     parser.add_argument("--lambda-min",type=float,default=3000,required=False,help="minimum wavelength")
     parser.add_argument("--lambda-max",type=float,default=10000,required=False,help="maximum wavelength")
 
@@ -22,10 +21,10 @@ if __name__=="__main__":
     ivar = flat[1].read()
     mask = flat[2].read()
     sky  = None
-    camera = args.camera
 
     ## read wdisp fibermap and wavelenghts and wdisp from cframe
     cframe=fitsio.FITS(args.cframe)
+    camera = cframe[0].read_header()["CAMERAS"].strip()
     wave = 10**flat[3].read()
     wave_wdisp = 10**cframe[3].read()[:,:flux.shape[1]]
     wave_new = wave[249,:]

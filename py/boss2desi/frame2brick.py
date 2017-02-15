@@ -1,18 +1,26 @@
 import scipy as sp
 import fitsio
-
-
+import boss2desi.fibermap
 
 class brick:
-    ndiag = 11
     def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,sky=None,wave_wdisp=None):
 
         self.camera = camera
 
-        iv *= (ma==0)
         la = wave
         la_wdisp = wave_wdisp
         wd = wdisp
+
+        ## ndiag = 3 wdisp
+        self.ndiag = 2*int(3*wdisp.max())+1
+        print "ndiag=",self.ndiag,wdisp.max()
+
+        ## turn off bits coming from sky subtraction:
+        ma = ma & (~2**22) & (~2**23)
+
+        ## turn off bits coming from flat-fielding
+        ma = ma & (~2**17)
+
         if not sky is None:
             fl+=sky
         nspec = fl.shape[0]
@@ -23,7 +31,13 @@ class brick:
         mask = sp.zeros([nspec,nbins],dtype=sp.uint32)
         re = sp.zeros([nspec,self.ndiag,nbins])
 
-        self.read_fibermap(fibermap)
+        self.fm = None
+        if fibermap is not None:
+            desi_fibermap = boss2desi.fibermap.boss_fibermap(fibermap,self.camera)
+            self.fm = desi_fibermap.fm
+            self.fm_names = desi_fibermap.fm_names
+
+
         for i in range(nspec):
             j = sp.searchsorted(la[i,:],lam)
             w=j>=len(la[i,:])
@@ -56,45 +70,7 @@ class brick:
         self.mask = mask
         self.re = re
     
-    def read_fibermap(self,fibermap):
-        ## get fibermap names
-        fm_names = fibermap.get_colnames()
-        nspec = len(fibermap[fm_names[0]][:])
-        ## create a fiber map and add all columns from boss' fibermap
-        fm = []
-        for i in fm_names:
-            fm.append(fibermap[i][:])
-
-        ## add fiber number
-        fm_names.append("FIBER")
-        fib_num = sp.arange(nspec,dtype=int)+1
-        if self.camera == 'b2' or self.camera == 'r2':
-            fib_num += 500
-        fm.append(fib_num)
-
-        ## add filter names
-        fm_names.append("FILTER")
-        fm.append(sp.array([["SDSS_U","SDSS_G","SDSS_R","SDSS_I","SDSS_Z"]]*nspec))
-
-        ## correct magnitudes
-        for i,obj in enumerate(fm[fm_names.index('MAG')]):
-            ## avoid NA and SKY
-            ## sky fibers don't have magnitudes
-            if fm[fm_names.index('OBJTYPE')][i].strip() != 'SKY'\
-                    and fm[fm_names.index('OBJTYPE')][i].strip() != 'NA':
-                ## fix only positive fluxes...
-                w = fm[fm_names.index('CALIBFLUX')][i] > 0
-                fm[fm_names.index("MAG")][i][w] = \
-                        22.5-2.5*sp.log10(fm[fm_names.index('CALIBFLUX')][i][w])
-
-        ## change names of standard stars to desi convention
-        for i,obj in enumerate(fm[fm_names.index("OBJTYPE")]):
-            fm[fm_names.index("OBJTYPE")][i] = obj.replace("SPECTROPHOTO_STD","STD")
-
-        self.fm_names = fm_names
-        self.fm = fm
-
-    def export(self,fout="brick.fits.gz"):
+    def export(self,fout):
         hlist=[]
         hlist.append({"name":"CAMERA","value":self.camera,"comment":" Spectograph Camera"})
 

@@ -3,6 +3,8 @@
 from boss2desi import frame2brick
 import fitsio
 import argparse
+from boss2desi import util
+import numpy as np
 
 
 if __name__=="__main__":
@@ -10,9 +12,10 @@ if __name__=="__main__":
     
     parser.add_argument("--frame",type=str,default=None,required=True,help="frame file")
     parser.add_argument("--cframe",type=str,default=None,required=True,help="cframe file. Required to read the wavelength solution of the frame.")
-    parser.add_argument("--wave",type=str,default=None,required=True,help="wavelength will be read from hdu[3] of this file.")
-    parser.add_argument("--lambda-min",type=float,default=3000,required=False,help="minimum wavelength")
-    parser.add_argument("--lambda-max",type=float,default=10000,required=False,help="maximum wavelength")
+    parser.add_argument("--arc",type=str,default=None,required=True,help="determine wdisp from this file instead of cframe")
+    parser.add_argument("--lambda-min",type=float,default=3500,required=False,help="minimum wavelength")
+    parser.add_argument("--lambda-max",type=float,default=6500,required=False,help="maximum wavelength")
+    parser.add_argument("--dlam",type=float,default=1,required=False,help="maximum wavelength")
     parser.add_argument("--out",type=str,default=None,required=True,help="output file")
 
     args=parser.parse_args()
@@ -21,25 +24,25 @@ if __name__=="__main__":
     flux = frame[0].read()
     ivar = frame[1].read()
     mask = frame[2].read()
-    sky  = frame[6].read()
-    camera = frame[0].read_header()["CAMERAS"]
-    fibermap = frame[5]
+    wave = 10**frame[3].read()
 
     ## read wdisp and wavelenghts and wdisp from cframe
     cframe=fitsio.FITS(args.cframe)
-    wave = 10**cframe[3].read()[:,:flux.shape[1]]
-    wave_wdisp = wave
-    wdisp= cframe[4].read()[:,:flux.shape[1]]
+    fibermap = cframe[5]
+    camera = cframe[0].read_header()["CAMERAS"]
 
 
-    ## interpolate into fiber 250 from flat-field wavelengths
-    wave_new = fitsio.FITS(args.wave)
-    wave_new = 10**wave_new[3].read()[249,:]
-    ## wavelength cuts:
-    w = (wave_new > args.lambda_min) & (wave_new < args.lambda_max)
+    ## wavelength:
+    wave_new = wave[249,:]
+#    nbins = int((args.lambda_max - args.lambda_min)/args.dlam)
+#    wave_new = args.lambda_min+np.arange(nbins)*args.dlam
+    w=(wave_new>args.lambda_min) & (wave_new<args.lambda_max)
     wave_new = wave_new[w]
+    ## wdisp
+    wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
 
-    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap,sky=sky,wave_wdisp=wave_wdisp)
+    ## The arc and the frame have the same wavelength solution
+    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap)
 
     b.export(args.out)
 

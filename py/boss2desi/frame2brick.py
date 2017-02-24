@@ -1,19 +1,18 @@
 import scipy as sp
+from numpy import linalg
+from scipy import sparse
+from scipy.sparse.linalg import lobpcg
+from scipy.interpolate import interp1d
+
 import fitsio
 import boss2desi.fibermap
+from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,sky=None,wave_wdisp=None):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap):
 
         self.camera = camera
 
-        la = wave
-        la_wdisp = wave_wdisp
-        wd = wdisp
-
-        ## ndiag = 3 wdisp
-        self.ndiag = 2*int(3*wdisp.max())+1
-        print "ndiag=",self.ndiag,wdisp.max()
 
         ## turn off bits coming from sky subtraction:
         ma = ma & (~2**22) & (~2**23)
@@ -21,15 +20,12 @@ class brick:
         ## turn off bits coming from flat-fielding
         ma = ma & (~2**17)
 
-        if not sky is None:
-            fl+=sky
         nspec = fl.shape[0]
         nbins = len(wave_new)
-        lam = wave_new
         flux = sp.zeros([nspec,nbins])
         ivar = sp.zeros([nspec,nbins])
         mask = sp.zeros([nspec,nbins],dtype=sp.uint32)
-        re = sp.zeros([nspec,self.ndiag,nbins])
+        re = []
 
         self.fm = None
         if fibermap is not None:
@@ -37,38 +33,40 @@ class brick:
             self.fm = desi_fibermap.fm
             self.fm_names = desi_fibermap.fm_names
 
+        index = sp.arange(len(wave[0,:]))
+        for fib in range(nspec):
+            print fib
+            i_wave = interp1d(wave[fib,:],index)
+            wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())
+            res = util.resolution(index[wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
+            norm = res.sum(axis=1)
+            res/=norm[:,None]
 
-        for i in range(nspec):
-            j = sp.searchsorted(la[i,:],lam)
-            w=j>=len(la[i,:])
-            j[w]-=1
-            flux[i,:] = (la[i,j]-lam)*fl[i,j-1]*iv[i,j-1] + (lam-la[i,j-1])*fl[i,j]*iv[i,j]
-            mask[i,:] = ma[i,j-1] & ma[i,j]
-            norm = (la[i,j]-lam)*iv[i,j-1] + (lam-la[i,j-1])*iv[i,j]
-            ivar[i,:] = norm**2
+            ## check that the centers of the resolution are within
+            ## 2*wdisp of a good pixel
+            centers = (res*wave[fib,wlam]).sum(axis=1)
+            w = iv[fib,:]>0
+            wgood = abs(centers-wave[fib,wlam & w,None]).min(axis=0)<2*wdisp[fib]
 
-            norm_ivar = (iv[i,j-1]*(la[i,j]-lam)**2 + iv[i,j]*(lam-la[i,j-1])**2)
-            w=norm_ivar>0
-            ivar[i,w]/=norm_ivar[w]
+            f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:])
+            flux[fib,wgood]=f
+            ivar[fib,wgood]=i
+            reso = sp.zeros([r.shape[0],nbins])
+            reso[:,wgood]=r
+            re.append(reso)
 
-            w=(iv[i,j-1]==0) | (iv[i,j]==0)
-            norm[w]=0
-            flux[i,w]=0
-            ivar[i,w]=0
+        ndiags = [r.shape[0] for r in re]
+        ndiag = max(ndiags)
+        print "max in diag {} in fiber {}".format(ndiag,sp.argmax(ndiags))
+        self.re = sp.zeros([nspec,ndiag,nbins])
+        for fib in range(len(re)):
+            nd = re[fib].shape[0]
+            self.re[fib,(ndiag-nd)/2:(ndiag+nd)/2]=re[fib]
 
-            w=norm>0
-            flux[i,w]/=norm[w]
-
-            wdisp=(la_wdisp[i,j]-lam)*wd[i,j-1] + (lam-la_wdisp[i,j-1])*wd[i,j]
-            wdisp/=la_wdisp[i,j]-la_wdisp[i,j-1]
-            re[i,:,:] = sp.exp(-(sp.arange(self.ndiag)-self.ndiag/2)[:,None]**2/2./wdisp**2)
-            re[i,:,:]/=sp.sum(re[i,:,:],axis=0)
-
-        self.lam = lam
+        self.lam = wave_new
         self.flux = flux
         self.ivar = ivar
         self.mask = mask
-        self.re = re
     
     def export(self,fout):
         hlist=[]

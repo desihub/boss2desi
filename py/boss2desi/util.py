@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import fitsio
 from numpy import linalg
@@ -6,12 +7,14 @@ import time
 import scipy as sp
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as pp
+import iminuit
+import traceback
 
 def resolution(i,i0,sigma):
     ## This is the resolution in pixel units
     ## integrate the gaussian over 1 pixel
-    res = (erf((i-i0+0.5)/sigma) - erf((i-i0-0.5)/sigma))*0.5*sigma
-    
+
+    res = (erf((i-i0+0.5)/sigma/sp.sqrt(2)) - erf((i-i0-0.5)/sigma/sp.sqrt(2)))*0.5*sigma
     return res
 
 def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
@@ -48,6 +51,118 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
 
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
+
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None):
+    harc = fitsio.FITS(arcfile)
+    flux = harc[0].read()
+    nfib = flux.shape[0]
+    wave = 10**harc[3].read()
+    ok = sp.ones(nfib,dtype=bool)
+
+    med = sp.median(flux.sum(axis=1))
+    w = flux.sum(axis=1) < med/100.
+    ok[w] = False
+
+    wdisp = np.zeros([nfib,len(wave_new)])
+    to = np.loadtxt(arclines,usecols=(0,))
+    if fiber==None:
+        fiber=range(nfib)
+    else:
+        fiber=[fiber]
+    for fib in fiber:
+        sys.stderr.write("fitting arc in fiber {} ".format(fib))
+        index = np.arange(flux.shape[1])
+        i = interp1d(wave[fib,:],index)
+        w = (to>wave[fib,:].min()) & (to<wave[fib,:].max())
+        try:
+            wd,a,b = fitDisp(flux[fib,:],i(to[w]))
+            wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
+            wdisp[fib,:] = wd(wave_new)
+            print "mean(wdisp) in fib {} {}".format(fib,wdisp[fib,:].mean())
+            if debug:
+                pp.figure(1)
+                pp.plot(a,b)
+                pp.plot(flux[fib,:])
+                #for l in arclines:
+                #    pp.plot(l+sp.zeros(2),flux[fib,:].max()*sp.arange(2),"k--")
+                pp.show()
+                pp.draw()
+                x=raw_input()
+                if x=="stop":
+                    return wdisp,ok
+                pp.clf()
+        except:
+            print "wdisp fit in fiber {} failed".format(fib)
+            if debug:
+                traceback.print_exc()
+                return wdisp,ok
+            wdisp[fib,:]=0.1
+            ok[fib]=False
+
+    if out is not None:
+        fout=open(out,"w")
+        for fib in range(wave.shape[0]):
+            iok = 1
+            if not ok[fib]:
+                iok = 0
+            fout.write("{} ".format(iok))
+        fout.write("\n")
+        for i in range(len(wave_new)):
+            fout.write("{} ".format(wave_new[i]))
+            for fib in range(wave.shape[0]):
+                fout.write("{} ".format(wdisp[fib,i]))
+            fout.write("\n")
+        fout.close()
+    return wdisp,ok
+        
+def fitDisp(flux,ilines,deg=2,tol=10):
+    ''' 
+    given a flux from the arc lamps fit sigmas
+    '''
+    index = sp.arange(len(flux))*1.
+    p = sp.zeros(deg+1)
+    imax = 1.*ilines.max()
+    imin = 1.*ilines.min()
+
+    dlam = abs(index[:,None]-ilines).min(axis=1)
+    w=dlam<tol
+    i0=index[w]
+    f0=flux[w]
+
+    def sigma(x,*p):
+        s = x*0.
+        u = (x-imin)/(imax-imin)
+        for i in range(deg+1):
+                s+=p[i]*u**i
+        return sp.exp(s)
+
+    def peaks(s):
+        ## find the amplitudes of the peaks with a linear fit
+        res = resolution(i0,ilines[:,None],s[:,None])
+        D = (f0*res).sum(axis=1)
+        M = res.dot(res.T)
+        A = linalg.inv(M).dot(D)
+        return A.T.dot(res)
+
+    def chi2(*p):
+        s = sigma(ilines,*p)
+        res = peaks(s)
+        ret = ((f0-res)**2).sum()
+        return ret
+    
+    pinit={'a1': -0.341836969722409, 'a0': 0.5172259852497609, 'a2': 0.4141426841348048}
+    pnames = ["a{}".format(i) for i in range(deg+1)]
+    kwds = {p:pinit[p] for p in pnames}
+    for p in pnames:
+        kwds["error_"+p]=0.1
+    kwds["limit_a0"]=(0,None)
+    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
+    mig.migrad()
+
+    s0 = sigma(ilines,*[mig.values[p] for p in pnames])
+    s1 = sigma(index,*[mig.values[p] for p in pnames])
+    return s1,i0,peaks(s0)
+
 
 def fitArc(arcfile,camera,lambda_out=None):
     h = fitsio.FITS(arcfile)
@@ -140,16 +255,21 @@ def spectro_perf(fl,iv,re):
     ## add at least the variance of a pixel in case Q is a delta function
     var = (Q*(index-mean[:,None])**2).sum(axis=1)+1./12
     std = sp.sqrt(var)
-    ## round 3*std to get ndiag
-    ndiag = int(3*std.max()+0.5)
+    ## round 4*std to get ndiag
+    ndiag = int(4*std.max()+0.5)
     if ndiag%2==0:
         ndiag+=1
-    
+
     print ndiag,std.max(),std.argmax()
 
     reso = sp.zeros([ndiag,nbins])
     for i in range(ndiag):
-        reso[i,:nbins-abs(i-ndiag/2)] = sp.diagonal(Q,offset=i-ndiag/2)
+        offset = ndiag/2-i
+        d = sp.diagonal(Q,offset=offset)
+        if offset<0:
+            reso[i,:len(d)] = d
+        else:
+            reso[i,nbins-len(d):nbins]=d
 
     t = time.time()
     print "spectro perfected in: ",t-t0

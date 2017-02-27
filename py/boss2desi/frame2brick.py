@@ -43,20 +43,30 @@ class brick:
             res/=norm[:,None]
 
             ## check that the centers of the resolution are within
-            ## 2*wdisp of a good pixel
-            centers = (res*wave[fib,wlam]).sum(axis=1)
+            ## two pixels of a good pixel
             w = iv[fib,:]>0
-            wgood = abs(centers-wave[fib,wlam & w,None]).min(axis=0)<2*wdisp[fib]
-
+            if w.sum()==0:
+                re.append(sp.zeros([2,nbins]))
+                continue
+            centers = res.dot(index[wlam])
+            wgood = abs(centers-index[wlam & w,None]).min(axis=0)<2
+            if wgood.sum()==0:
+                re.append(sp.zeros([2,nbins]))
+                continue
             f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:])
             flux[fib,wgood]=f
             ivar[fib,wgood]=i
             reso = sp.zeros([r.shape[0],nbins])
             reso[:,wgood]=r
             re.append(reso)
+            #f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res)
+            #flux[fib,:]=f
+            #ivar[fib,:]=i
+            #re.append(r)
 
-        ndiags = [r.shape[0] for r in re]
-        ndiag = max(ndiags)
+        ndiags = sp.array([r.shape[0] for r in re])
+        w = ivar.sum(axis=1)>0
+        ndiag = max(ndiags[w])
         print "max in diag {} in fiber {}".format(ndiag,sp.argmax(ndiags))
         self.re = sp.zeros([nspec,ndiag,nbins])
         for fib in range(len(re)):

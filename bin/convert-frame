@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
+import sys
 from boss2desi import frame2brick
 import fitsio
 import argparse
 from boss2desi import util
-import numpy as np
+import scipy as sp
+from scipy.interpolate import interp1d
 
 
 if __name__=="__main__":
@@ -16,6 +18,9 @@ if __name__=="__main__":
     parser.add_argument("--lambda-min",type=float,default=3500,required=False,help="minimum wavelength")
     parser.add_argument("--lambda-max",type=float,default=6500,required=False,help="maximum wavelength")
     parser.add_argument("--dlam",type=float,default=1,required=False,help="maximum wavelength")
+    parser.add_argument("--arclines",type=str,default=None,required=True,help="file with the list of lines in arc lamp")
+    parser.add_argument("--wdisp",type=str,default=None,required=False,help="file with the wdisp")
+    
     parser.add_argument("--out",type=str,default=None,required=True,help="output file")
 
     args=parser.parse_args()
@@ -39,8 +44,23 @@ if __name__=="__main__":
     w=(wave_new>args.lambda_min) & (wave_new<args.lambda_max)
     wave_new = wave_new[w]
     ## wdisp
-    wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
+    #wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
+    if args.wdisp is None:
+        wdisp,ok = util.newFitArc(args.arc,wave_new,args.arclines)
+    else:
+        f=open(args.wdisp)
+        ok=f.readline()
+        ok=ok.split()
+        ok = [int(o)==1 for o in ok]
+        ok = sp.array(ok)
+        to=sp.loadtxt(args.wdisp,skiprows=1)
+        wd=to[:,1:].T
+        wdisp = sp.zeros((wd.shape[0],len(wave_new)))
+        for i in range(wd.shape[0]):
+            wdisp[i,:] = interp1d(to[:,0],wd[i,:])(wave_new)
 
+
+    ivar[~ok,:]=0.
     ## The arc and the frame have the same wavelength solution
     b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap)
 

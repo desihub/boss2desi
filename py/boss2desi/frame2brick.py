@@ -9,7 +9,7 @@ import boss2desi.fibermap
 from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None):
 
         self.camera = camera
 
@@ -33,23 +33,37 @@ class brick:
             self.fm = desi_fibermap.fm
             self.fm_names = desi_fibermap.fm_names
 
-        index = sp.arange(len(wave[0,:]))
+        index = sp.arange(wave.shape[1])
         for fib in range(nspec):
-            print fib
+            i0 = index
+            if skylines is not None:
+                to=sp.loadtxt(skylines,usecols=(0,))
+                w = (to>wave[fib].min()) & (to<wave[fib].max())
+                ilines=interp1d(wave[fib],index)(to[w])
+                try:
+                    i0,ep,eta = util.fitSkyLines(fl[fib],iv[fib],ilines)
+                    print fib,ep,eta
+                    if log is not None:
+                        log.write("{} {} {}\n".format(fib,ep,eta))
+                except:
+                    print "fitSkyLines failed in fib {}".format(fib)
+                    if log is not None:
+                        log.write("fit skylines failed in fib {}\n".format(fib))
             i_wave = interp1d(wave[fib,:],index)
             wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())
-            res = util.resolution(index[wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
+            res = util.resolution(i0[wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
             norm = res.sum(axis=1)
             res/=norm[:,None]
 
-            ## check that the centers of the resolution are within
-            ## two pixels of a good pixel
             w = iv[fib,:]>0
             if w.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-            centers = res.dot(index[wlam])
-            wgood = abs(centers-index[wlam & w,None]).min(axis=0)<2
+            ## check that the centers of the resolution are within
+            ## two pixels of a good pixel
+            #centers = res.dot(i0[wlam])
+            centers = i_wave(wave_new)
+            wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue

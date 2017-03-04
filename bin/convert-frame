@@ -19,9 +19,11 @@ if __name__=="__main__":
     parser.add_argument("--lambda-max",type=float,default=6500,required=False,help="maximum wavelength")
     parser.add_argument("--dlam",type=float,default=1,required=False,help="maximum wavelength")
     parser.add_argument("--arclines",type=str,default=None,required=True,help="file with the list of lines in arc lamp")
+    parser.add_argument("--skylines",type=str,default=None,required=False,help="file with the list of sky lines")
     parser.add_argument("--wdisp",type=str,default=None,required=False,help="file with the wdisp")
     
     parser.add_argument("--out",type=str,default=None,required=True,help="output file")
+    parser.add_argument("--log",type=str,default=None,required=False,help="log file")
 
     args=parser.parse_args()
 
@@ -45,8 +47,13 @@ if __name__=="__main__":
     wave_new = wave_new[w]
     ## wdisp
     #wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
+
+    log=None
+    if args.log is not None:
+        log = open(args.log,"w")
+
     if args.wdisp is None:
-        wdisp,ok = util.newFitArc(args.arc,wave_new,args.arclines)
+        wdisp,ok = util.newFitArc(args.arc,wave_new,args.arclines,log=log)
     else:
         f=open(args.wdisp)
         ok=f.readline()
@@ -62,8 +69,9 @@ if __name__=="__main__":
 
     ivar[~ok,:]=0.
     ## The arc and the frame have the same wavelength solution
-    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap)
+    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap,skylines=args.skylines,log=log)
 
+    log.close()
     b.export(args.out)
 
 

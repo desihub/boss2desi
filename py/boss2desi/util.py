@@ -52,7 +52,7 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
 
-def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None):
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):
     harc = fitsio.FITS(arcfile)
     flux = harc[0].read()
     nfib = flux.shape[0]
@@ -98,6 +98,8 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None):
                 return wdisp,ok
             wdisp[fib,:]=0.1
             ok[fib]=False
+            if log is not None:
+                log.write("failed wdisp fit in fiber {} \n".format(fib))
 
     if out is not None:
         fout=open(out,"w")
@@ -220,6 +222,88 @@ def fitArc(arcfile,camera,lambda_out=None):
             wdisp[fib,mask]=wd
         
     return lam,wdisp,l0,w0
+
+def fitSkyLines(flux,ivar,ilines,tol=10):
+    '''
+    fit shift and dilation parameters to fix drifts in the wavelength solution from the arc
+    '''
+    
+    nlines = len(ilines)
+    nbins = len(flux)
+    index = sp.arange(nbins)
+    used_ilines = []
+    fl = []
+    iv = []
+    x = []
+    for i in range(nlines):
+        w = abs(index-ilines[i]) < tol
+        norm = ivar[w].sum()
+        if norm==0:
+            continue
+        
+        fl.append(flux[w])
+        iv.append(ivar[w]/ivar[w].sum())
+        x.append(index[w])
+        used_ilines.append(ilines[i])
+    fl = sp.array(fl)
+    iv = sp.array(iv)
+    x = sp.array(x)
+    used_ilines = sp.array(used_ilines)
+    nlines = len(used_ilines)
+    ## require at least 4 lines to do the fits
+    if len(used_ilines)<4:
+        return index,0,0
+
+    def peak(i,i0,sigma):
+        f = sp.exp(-(i-i0)**2/2/sigma**2)
+        xbar = (iv*f).sum(axis=1)
+        x2bar = (iv*f**2).sum(axis=1)
+        dbar = (iv*fl).sum(axis=1)
+        dxbar= (iv*fl*f).sum(axis=1)
+        M = [ sp.array([ [1,xbar[l]], [xbar[l],x2bar[l]] ]) for l in range(nlines)]
+        C = [ linalg.inv(M[l]).dot([dbar[l],dxbar[l]]) for l in range(nlines)]
+        C = sp.array(C)
+        B = C[:,0,None]
+        A = C[:,1,None]
+        fit = B+A*f
+        return fit
+
+    def line_shift(i,epsilon,eta):
+        return epsilon+(1+eta)*i
+
+    def chi2(*p):
+        p = sp.array(p)
+        epsilon = p[0]
+        eta = p[1]
+        sigma = p[2:]
+        peaks = sp.zeros((nlines,nbins))
+        i = line_shift(x,epsilon,eta)
+        peaks = peak(i,used_ilines[:,None],sigma[:,None])
+        chisq = ((fl-peaks)**2*iv).sum()
+        return ((fl-peaks)**2*iv).sum()
+
+    pars=["epsilon","eta"]
+    kwds={"epsilon":0.,"eta":0.,"error_epsilon":0.1,"error_eta":1e-4}
+    kwds["limit_epsilon"]=(-2,2)
+    kwds["limit_eta"]=(-1e-3,1e-3)
+    for i in range(nlines):
+        p = "sigma"+str(i)
+        p0 = 1.
+        dp0=0.5
+        kwds[p]=p0
+        kwds["error_"+p]=dp0
+        kwds["limit_"+p]=(1./sp.sqrt(12),2.)
+        pars.append(p)
+#    kwds["fix_epsilon"]=True
+#    kwds["fix_eta"]=True
+    mig = iminuit.Minuit(chi2,forced_parameters=pars,errordef=1,print_level=0,**kwds)
+    mig.migrad()
+    epsilon = mig.values["epsilon"]
+    eta = mig.values["eta"]
+    sigma = [mig.values["sigma"+str(i)] for i in range(nlines)]
+    sigma = sp.array(sigma)
+    i = line_shift(index,epsilon,eta)
+    return i,epsilon,eta
 
 def spectro_perf(fl,iv,re):
     t0 = time.time()

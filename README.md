@@ -2,7 +2,7 @@
 
 example run:
 
-python bin/convert.py --frame spFrame-b1-00121278.fits.gz --cframe spCFrame-b1-00121278.fits --wave flat-b1-00121277.fits --out frame-b1-00121278.fits.gz
+python bin/convert-frame --frame frame.fits --cframe spCFrame-b1-00121278.fits --wa --out frame-b1-00121278.fits.gz
 
 This will create the frame-b1-00121278.fits.gz file following the desi brick conventions:
 

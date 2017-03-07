@@ -52,8 +52,7 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
 
-def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):
-    harc = fitsio.FITS(arcfile)
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):    harc = fitsio.FITS(arcfile)
     flux = harc[0].read()
     nfib = flux.shape[0]
     wave = 10**harc[3].read()
@@ -78,7 +77,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
             wd,a,b = fitDisp(flux[fib,:],i(to[w]))
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
-            sys.stderr.wrote("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
+            sys.stderr.write("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
             if debug:
                 pp.figure(1)
                 pp.plot(a,b)
@@ -317,7 +316,8 @@ def spectro_perf(fl,iv,re):
 
     ## invert
     d_inv = d*0
-    w = d>d.max()*1e-10
+    #w = d>d.max()*1e-10
+    w=d>0
     d[~w]=0
     d_inv[w]=1/d[w]
     IR = s.dot(d_inv[:,None]*s.T)

@@ -70,7 +70,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
     else:
         fiber=[fiber]
     for fib in fiber:
-        sys.stderr.write("fitting arc in fiber {} ".format(fib))
+        sys.stderr.write("fitting arc in fiber {}\n ".format(fib))
         index = np.arange(flux.shape[1])
         i = interp1d(wave[fib,:],index)
         w = (to>wave[fib,:].min()) & (to<wave[fib,:].max())
@@ -78,7 +78,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
             wd,a,b = fitDisp(flux[fib,:],i(to[w]))
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
-            print "mean(wdisp) in fib {} {}".format(fib,wdisp[fib,:].mean())
+            sys.stderr.wrote("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
             if debug:
                 pp.figure(1)
                 pp.plot(a,b)

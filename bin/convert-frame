@@ -71,7 +71,8 @@ if __name__=="__main__":
     ## The arc and the frame have the same wavelength solution
     b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap,skylines=args.skylines,log=log)
 
-    log.close()
+    if log is not None:
+        log.close()
     b.export(args.out)
 
 

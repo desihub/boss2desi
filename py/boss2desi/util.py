@@ -52,7 +52,8 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
 
-def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):    harc = fitsio.FITS(arcfile)
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):    
+    harc = fitsio.FITS(arcfile)
     flux = harc[0].read()
     nfib = flux.shape[0]
     wave = 10**harc[3].read()

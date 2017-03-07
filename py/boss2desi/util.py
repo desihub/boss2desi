@@ -305,7 +305,7 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
     i = line_shift(index,epsilon,eta)
     return i,epsilon,eta
 
-def spectro_perf(fl,iv,re):
+def spectro_perf(fl,iv,re,tol=1e-3):
     t0 = time.time()
     ## compute R and F
     R = sp.sqrt(iv)*re
@@ -317,8 +317,8 @@ def spectro_perf(fl,iv,re):
 
     ## invert
     d_inv = d*0
-    #w = d>d.max()*1e-10
-    w=d>0
+    w = d>d.max()*1e-10
+    #w=d>1e-20
     d[~w]=0
     d_inv[w]=1/d[w]
     IR = s.dot(d_inv[:,None]*s.T)
@@ -331,22 +331,28 @@ def spectro_perf(fl,iv,re):
     flux = Q.dot(F)
     ivar = norm**2
 
-    ## find the variance of the Q matrices
-    ## ndiag ~ 3*sqrt(var)
+    ## ndiag is such that the sum of the diagonals > 1-tol
 
-    nbins = len(flux)
-    index = sp.arange(nbins)
-    mean = (Q*index).sum(axis=1)
-    ## add at least the variance of a pixel in case Q is a delta function
-    var = (Q*(index-mean[:,None])**2).sum(axis=1)+1./12
-    std = sp.sqrt(var)
-    ## round 4*std to get ndiag
-    ndiag = int(4*std.max()+0.5)
-    if ndiag%2==0:
-        ndiag+=1
+    ndiag=1
+    for i in range(Q.shape[0]):
+        imin = i-ndiag/2
+        if imin<0:imin=0
+        imax = i+ndiag/2
+        if imax>=Q.shape[1]:
+            imax = Q.shape[1]
 
-    print ndiag,std.max(),std.argmax()
+        frac=Q[i,imin:imax].sum()
+        while frac<1-tol:
+            ndiag+=2
+            imin = i-ndiag/2
+            if imin<0:imin=0
+            imax = i+ndiag/2
+            if imax>=Q.shape[1]:imax = Q.shape[1]
+            frac = Q[i,imin:imax].sum()
 
+    sys.stderr.write("\n final ndiag: {}\n".format(ndiag))
+
+    nbins = Q.shape[1]
     reso = sp.zeros([ndiag,nbins])
     for i in range(ndiag):
         offset = ndiag/2-i

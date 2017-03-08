@@ -124,6 +124,26 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         fout.close()
     return wdisp,ok
         
+## polynomial interpolation between the nodes
+def int_poly(x,*pars):
+    ''' 
+    x is between -1 and 1
+    '''
+    deg = len(pars)-1
+    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
+    ##node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
+    node = -1+2*sp.arange(deg+1,dtype=float)/deg
+
+    res = x*0.
+
+    for i in range(deg+1):
+        aux=x*0.+1
+        for j in range(deg+1):
+            if j==i:continue
+            aux*=(x-node[j])/(node[i]-node[j])
+        res += pars[i]*aux
+    return res
+
 def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     ''' 
     given a flux from the arc lamps fit sigmas
@@ -136,20 +156,7 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     imin = 0.
     nlines=len(ilines)
 
-    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
-    node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
-    node = (imax+imin)/2 + (imax-imin)*node/2
 
-    ## polynomial interpolation between the nodes
-    def int_poly(x,*pars):
-        res = x*0.+1
-        for i in range(deg+1):
-            aux=x*0.+1
-            for j in range(deg+1):
-                if j==i:continue
-                aux*=(x-node[j])/(node[i]-node[j])
-            res += pars[i]*aux
-        return res
 
     dlam = abs(index[:,None]-ilines).min(axis=1)
     w=dlam<tol
@@ -157,7 +164,8 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     f0=flux[w]
 
     def sigma(x,*p):
-        s=int_poly(x,*p)
+        u = (2*x-(imin+imax))/(imax-imin)
+        s=int_poly(u,*p)
         return s
 
     def peaks(s):
@@ -180,8 +188,8 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     kwds = {p:pinit[p] for p in pnames}
     for p in pnames:
         kwds["error_"+p]=0.1
-        kwds["limit_"+p]=(0,3)
-    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
+        kwds["limit_"+p]=(1./sp.sqrt(12),3)
+    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=2,**kwds)
     mig.migrad()
 
     s0 = sigma(ilines,*[mig.values[p] for p in pnames])

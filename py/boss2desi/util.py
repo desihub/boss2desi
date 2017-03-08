@@ -52,7 +52,7 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
 
-def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None):    
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None,deg=None):
     harc = fitsio.FITS(arcfile)
     flux = harc[0].read()
     nfib = flux.shape[0]
@@ -75,9 +75,16 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         i = interp1d(wave[fib,:],index)
         w = (to>wave[fib,:].min()) & (to<wave[fib,:].max())
         try:
-            wd,a,b = fitDisp(flux[fib,:],i(to[w]))
+            wd,a,b,pars = fitDisp(flux[fib,:],i(to[w]),deg=deg,log=log)
+
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
+            if log is not None:
+                log.write("wdisp({}) ".format(fib))
+                for p in pars:
+                    log.write("{} ".format(p))
+                log.write("\n")
+                log.flush()
             sys.stderr.write("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
             if debug:
                 pp.figure(1)
@@ -117,10 +124,12 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         fout.close()
     return wdisp,ok
         
-def fitDisp(flux,ilines,deg=2,tol=10):
+def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     ''' 
     given a flux from the arc lamps fit sigmas
     '''
+    if deg is None:
+        deg=2
     index = sp.arange(len(flux))*1.
     p = sp.zeros(deg+1)
     imax = 1.*ilines.max()
@@ -153,6 +162,8 @@ def fitDisp(flux,ilines,deg=2,tol=10):
         return ret
     
     pinit={'a1': -0.341836969722409, 'a0': 0.5172259852497609, 'a2': 0.4141426841348048}
+    for i in range(3,deg+1):
+        pinit['a'+str(i)]=0.01
     pnames = ["a{}".format(i) for i in range(deg+1)]
     kwds = {p:pinit[p] for p in pnames}
     for p in pnames:
@@ -163,7 +174,7 @@ def fitDisp(flux,ilines,deg=2,tol=10):
 
     s0 = sigma(ilines,*[mig.values[p] for p in pnames])
     s1 = sigma(index,*[mig.values[p] for p in pnames])
-    return s1,i0,peaks(s0)
+    return s1,i0,peaks(s0),mig.values.values()
 
 
 def fitArc(arcfile,camera,lambda_out=None):
@@ -305,7 +316,7 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
     i = line_shift(index,epsilon,eta)
     return i,epsilon,eta
 
-def spectro_perf(fl,iv,re,tol=1e-3):
+def spectro_perf(fl,iv,re,tol=1e-3,log=None):
     t0 = time.time()
     ## compute R and F
     R = sp.sqrt(iv)*re
@@ -364,5 +375,15 @@ def spectro_perf(fl,iv,re,tol=1e-3):
 
     t = time.time()
     sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
+    if log is not None:
+        log.write("\n final ndiag: {}\n".format(ndiag))
+        log.write("spectro perfected in: {} \n".format(t-t0))
+        log.flush()
     return flux,ivar,reso
+def convert_air_to_vacuum(air_wave) :
+    ## copied over from specex
+    sigma2 = (1e4/air_wave)**2
+    fact = 1. +  5.792105e-2/(238.0185 - sigma2) +  1.67917e-3/( 57.362 - sigma2)
+    vacuum_wave = air_wave*fact
 
+    return vacuum_wave

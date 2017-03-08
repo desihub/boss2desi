@@ -61,22 +61,18 @@ class brick:
                 continue
             ## check that the centers of the resolution are within
             ## two pixels of a good pixel
-            #centers = res.dot(i0[wlam])
+
             centers = i_wave(wave_new)
             wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-            f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:])
+            f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
             flux[fib,wgood]=f
             ivar[fib,wgood]=i
             reso = sp.zeros([r.shape[0],nbins])
             reso[:,wgood]=r
             re.append(reso)
-            #f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res)
-            #flux[fib,:]=f
-            #ivar[fib,:]=i
-            #re.append(r)
 
         ndiags = sp.array([r.shape[0] for r in re])
         w = ivar.sum(axis=1)>0
@@ -100,7 +96,8 @@ class brick:
         brick.write(self.flux,extname="FLUX",header=hlist)
         brick.write(self.ivar,extname="IVAR")
         brick.write(self.mask,extname="MASK")
-        brick.write(self.lam,extname="WAVELENGTH")
+        lam_vac = util.convert_air_to_vacuum(self.lam)
+        brick.write(lam_vac,extname="WAVELENGTH")
         brick.write(self.re,extname="RESOLUTION")
         brick.write(self.fm,names=self.fm_names,extname="FIBERMAP")
         brick.close()

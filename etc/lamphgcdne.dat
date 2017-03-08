@@ -6,9 +6,10 @@
   3466.200    100.0  BLEND  Cd I
   3467.655    100.0  BLEND  Cd I
   3610.508   1000.0  GOOD   Cd I
-# 3612.873    100.0  GOOD   Cd I # We don't see this line?
+  3612.873    100.0  GOOD   Cd I # We don't see this line?
   3650.157    100.0  GOOD   Hg I
   3654.839    100.0  GOOD   Hg I
+  3662.887    100.0  GOOD  Hg I ## added by ngbusca
   3901.867     50.0  BLEND  Hg I 
   3906.372    100.0  BLEND  Hg I
   3983.839   1000.0  GOOD   Hg II

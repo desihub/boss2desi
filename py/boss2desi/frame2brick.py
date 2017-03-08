@@ -3,7 +3,7 @@ from numpy import linalg
 from scipy import sparse
 from scipy.sparse.linalg import lobpcg
 from scipy.interpolate import interp1d
-
+import sys
 import fitsio
 import boss2desi.fibermap
 from boss2desi import util
@@ -42,11 +42,11 @@ class brick:
                 ilines=interp1d(wave[fib],index)(to[w])
                 try:
                     i0,ep,eta = util.fitSkyLines(fl[fib],iv[fib],ilines)
-                    print fib,ep,eta
+                    sys.stdout.write("{} {} {}\n".format(fib,ep,eta))
                     if log is not None:
                         log.write("{} {} {}\n".format(fib,ep,eta))
                 except:
-                    print "fitSkyLines failed in fib {}".format(fib)
+                    sys.stdout.write("fitSkyLines failed in fib {}\n".format(fib))
                     if log is not None:
                         log.write("fit skylines failed in fib {}\n".format(fib))
             i_wave = interp1d(wave[fib,:],index)
@@ -81,7 +81,7 @@ class brick:
         ndiags = sp.array([r.shape[0] for r in re])
         w = ivar.sum(axis=1)>0
         ndiag = max(ndiags[w])
-        print "max in diag {} in fiber {}".format(ndiag,sp.argmax(ndiags))
+        sys.stdout.write("max in diag {} in fiber {}\n".format(ndiag,sp.argmax(ndiags)))
         self.re = sp.zeros([nspec,ndiag,nbins])
         for fib in range(len(re)):
             nd = re[fib].shape[0]

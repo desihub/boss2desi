@@ -92,7 +92,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
                     return wdisp,ok
                 pp.clf()
         except:
-            print "wdisp fit in fiber {} failed".format(fib)
+            sys.stdout.write("wdisp fit in fiber {} failed\n".format(fib))
             if debug:
                 traceback.print_exc()
                 return wdisp,ok
@@ -363,6 +363,6 @@ def spectro_perf(fl,iv,re,tol=1e-3):
             reso[i,nbins-len(d):nbins]=d
 
     t = time.time()
-    print "spectro perfected in: ",t-t0
+    sys.stdout.write("spectro perfected in: \n",t-t0)
     return flux,ivar,reso
 

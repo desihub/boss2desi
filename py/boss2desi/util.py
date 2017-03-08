@@ -316,7 +316,7 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
     i = line_shift(index,epsilon,eta)
     return i,epsilon,eta
 
-def spectro_perf(fl,iv,re,tol=1e-3,log=None):
+def spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
     t0 = time.time()
     ## compute R and F
     R = sp.sqrt(iv)*re
@@ -361,8 +361,9 @@ def spectro_perf(fl,iv,re,tol=1e-3,log=None):
             if imax>=Q.shape[1]:imax = Q.shape[1]
             frac = Q[i,imin:imax].sum()
 
-    sys.stderr.write("\n final ndiag: {}\n".format(ndiag))
-
+    if ndiag>ndiag_max:
+        log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))
+        ndiag=ndiag_max
     nbins = Q.shape[1]
     reso = sp.zeros([ndiag,nbins])
     for i in range(ndiag):

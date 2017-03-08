@@ -67,8 +67,6 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
     to = np.loadtxt(arclines,usecols=(0,))
     if fiber==None:
         fiber=range(nfib)
-    else:
-        fiber=[fiber]
     for fib in fiber:
         sys.stderr.write("fitting arc in fiber {}\n ".format(fib))
         index = np.arange(flux.shape[1])
@@ -124,49 +122,36 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         fout.close()
     return wdisp,ok
         
-## polynomial interpolation between the nodes
-def int_poly(x,*pars):
-    ''' 
-    x is between -1 and 1
-    '''
-    deg = len(pars)-1
-    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
-    ##node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
-    node = -1+2*sp.arange(deg+1,dtype=float)/deg
-
-    res = x*0.
-
-    for i in range(deg+1):
-        aux=x*0.+1
-        for j in range(deg+1):
-            if j==i:continue
-            aux*=(x-node[j])/(node[i]-node[j])
-        res += pars[i]*aux
-    return res
-
-def fitDisp(flux,ilines,tol=10,deg=2,log=None):
+def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
     ''' 
     given a flux from the arc lamps fit sigmas
     '''
     if deg is None:
         deg=2
     nbins = len(flux)
-    index = sp.arange(nbins,dtype=float)
+    index = sp.arange(nbins)
     imax = 1.*nbins
     imin = 0.
     nlines=len(ilines)
 
-
+    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
+    ##node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
+    node = -1+2*sp.arange(deg+1,dtype=float)/deg
+    pol = sp.ones([deg+1,len(ilines)])
+    u = (2.*ilines-(imin+imax))/(imax-imin)
+    for i in range(deg+1):
+        for j in range(deg+1):
+            if j==i:continue
+            pol[i]*=(u-node[j])/(node[i]-node[j])
 
     dlam = abs(index[:,None]-ilines).min(axis=1)
     w=dlam<tol
     i0=index[w]
     f0=flux[w]
 
-    def sigma(x,*p):
-        u = (2*x-(imin+imax))/(imax-imin)
-        s=int_poly(u,*p)
-        return s
+    def sigma(p):
+        s=p.dot(pol)
+        return sp.exp(s)
 
     def peaks(s):
         ## find the amplitudes of the peaks with a linear fit
@@ -177,23 +162,31 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
         return A.T.dot(res)
 
     def chi2(*p):
-        s = sigma(ilines,*p)
+        s = sigma(sp.array(p))
         res = peaks(s)
         ret = ((f0-res)**2).sum()
         return ret
     pinit={}
+    if p0 is None:
+        p0 = sp.ones(deg+1)
     for i in range(deg+1):
-        pinit['a'+str(i)]=1.
+        pinit['a'+str(i)]=p0[i]
     pnames = ["a{}".format(i) for i in range(deg+1)]
     kwds = {p:pinit[p] for p in pnames}
     for p in pnames:
         kwds["error_"+p]=0.1
-        kwds["limit_"+p]=(1./sp.sqrt(12),3)
-    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=2,**kwds)
+        kwds["limit_"+p]=(-0.5*sp.log(12.),sp.log(3))
+    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
     mig.migrad()
 
-    s0 = sigma(ilines,*[mig.values[p] for p in pnames])
-    s1 = sigma(index,*[mig.values[p] for p in pnames])
+    s0 = sigma(sp.array([mig.values[p] for p in pnames]))
+    pol = sp.ones([deg+1,nbins])
+    u = (2.*index-(imin+imax))/(imax-imin)
+    for i in range(deg+1):
+        for j in range(deg+1):
+            if j==i:continue
+            pol[i]*=(u-node[j])/(node[i]-node[j])
+    s1 = sigma(sp.array([mig.values[p] for p in pnames]))
     return s1,i0,peaks(s0),mig.values.values()
 
 

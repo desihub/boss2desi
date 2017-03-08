@@ -130,10 +130,26 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     '''
     if deg is None:
         deg=2
-    index = sp.arange(len(flux))*1.
-    p = sp.zeros(deg+1)
-    imax = 1.*ilines.max()
-    imin = 1.*ilines.min()
+    nbins = len(flux)
+    index = sp.arange(nbins,dtype=float)
+    imax = 1.*nbins
+    imin = 0.
+    nlines=len(ilines)
+
+    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
+    node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
+    node = (imax+imin)/2 + (imax-imin)*node/2
+
+    ## polynomial interpolation between the nodes
+    def int_poly(x,*pars):
+        res = x*0.+1
+        for i in range(deg+1):
+            aux=x*0.+1
+            for j in range(deg+1):
+                if j==i:continue
+                aux*=(x-node[j])/(node[i]-node[j])
+            res += pars[i]*aux
+        return res
 
     dlam = abs(index[:,None]-ilines).min(axis=1)
     w=dlam<tol
@@ -141,11 +157,8 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
     f0=flux[w]
 
     def sigma(x,*p):
-        s = x*0.
-        u = (x-imin)/(imax-imin)
-        for i in range(deg+1):
-                s+=p[i]*u**i
-        return sp.exp(s)
+        s=int_poly(x,*p)
+        return s
 
     def peaks(s):
         ## find the amplitudes of the peaks with a linear fit
@@ -160,15 +173,14 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None):
         res = peaks(s)
         ret = ((f0-res)**2).sum()
         return ret
-    
-    pinit={'a1': -0.341836969722409, 'a0': 0.5172259852497609, 'a2': 0.4141426841348048}
-    for i in range(3,deg+1):
-        pinit['a'+str(i)]=0.01
+    pinit={}
+    for i in range(deg+1):
+        pinit['a'+str(i)]=1.
     pnames = ["a{}".format(i) for i in range(deg+1)]
     kwds = {p:pinit[p] for p in pnames}
     for p in pnames:
         kwds["error_"+p]=0.1
-    kwds["limit_a0"]=(0,None)
+        kwds["limit_"+p]=(0,3)
     mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
     mig.migrad()
 

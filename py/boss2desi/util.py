@@ -363,6 +363,6 @@ def spectro_perf(fl,iv,re,tol=1e-3):
             reso[i,nbins-len(d):nbins]=d
 
     t = time.time()
-    sys.stdout.write("spectro perfected in: \n",t-t0)
+    sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
     return flux,ivar,reso
 

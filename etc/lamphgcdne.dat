@@ -7,17 +7,19 @@
   3467.655    100.0  BLEND  Cd I
   3610.508   1000.0  GOOD   Cd I
   3612.873    100.0  GOOD   Cd I # We don't see this line?
-  3614.43     100. GOOD Cd I ## added by ngbusca
+  3614.453     100. GOOD Cd I ## added by ngbusca
   3649.56     100. GOOD Cd I ## added by ngbusca
-  3650.157    100.0  GOOD   Hg I
-  3654.839    100.0  GOOD   Hg I
+  3650.158    100.0  GOOD   Hg I 
+  3654.842    100.0  GOOD   Hg I
   3662.887    100.0  GOOD  Hg I ## added by ngbusca
+  3663.284    100.0  GOOD  Hg I ## added by ngbusca
   3901.867     50.0  BLEND  Hg I 
   3906.372    100.0  BLEND  Hg I
   3983.839   1000.0  GOOD   Hg II
+  4042.642   500 BLEND Ne I ## added by ngbusca
   4046.572  20000.0  GOOD   Hg I
   4077.838   2000.0  GOOD   Hg I
-#  4105.05     100.0  GOOD   Hg I
+  4105.05     100.0  GOOD   Hg I
   4306.672    100.0  GOOD   Cd I
   4339.22     100.0  GOOD   Hg I
   4347.506    100.0  GOOD   Hg I

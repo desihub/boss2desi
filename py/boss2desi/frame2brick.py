@@ -68,6 +68,7 @@ class brick:
                 re.append(sp.zeros([2,nbins]))
                 continue
             f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
             flux[fib,wgood]=f
             ivar[fib,wgood]=i
             reso = sp.zeros([r.shape[0],nbins])

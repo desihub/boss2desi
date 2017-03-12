@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import fitsio
-from numpy import linalg
+from scipy import linalg
 from scipy.special import erf
 import time
 import scipy as sp
@@ -13,8 +13,8 @@ import traceback
 def resolution(i,i0,sigma):
     ## This is the resolution in pixel units
     ## integrate the gaussian over 1 pixel
-
     res = (erf((i-i0+0.5)/sigma/sp.sqrt(2)) - erf((i-i0-0.5)/sigma/sp.sqrt(2)))*0.5*sigma
+    ##res = sp.exp(-(i-i0)**2/2/sigma**2)
     return res
 
 def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
@@ -86,8 +86,9 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
             sys.stderr.write("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
             if debug:
                 pp.figure(1)
-                pp.plot(a,b)
-                pp.plot(flux[fib,:])
+                pp.plot(wave[fib,a],b)
+                pp.plot(wave[fib,:],flux[fib,:])
+                pp.grid()
                 #for l in arclines:
                 #    pp.plot(l+sp.zeros(2),flux[fib,:].max()*sp.arange(2),"k--")
                 pp.show()
@@ -134,7 +135,7 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
     imin = 0.
     nlines=len(ilines)
 
-    ## nodes at the zeros of the chebyshev polynomials to minimize ringing
+    ## nodes at the zeros of the chebyshev polynomials to minimize ringing?
     ##node = sp.cos(sp.pi*(2*sp.arange(deg+1,dtype=float)+1)/2/(deg+1))
     node = -1+2*sp.arange(deg+1,dtype=float)/deg
     pol = sp.ones([deg+1,len(ilines)])
@@ -188,6 +189,57 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
             pol[i]*=(u-node[j])/(node[i]-node[j])
     s1 = sigma(sp.array([mig.values[p] for p in pnames]))
     return s1,i0,peaks(s0),mig.values.values()
+
+def fitArcLines(flux,ilines,tol=10,log=None,p0=None,ivar=None):
+    ''' 
+    given a flux from the arc lamps fit sigmas
+    '''
+    nbins = len(flux)
+    index = sp.arange(nbins)
+    nlines=len(ilines)
+
+    dlam = abs(index[:,None]-ilines).min(axis=1)
+    w=dlam<tol
+    i0=index[w]
+    f0=flux[w]
+    if ivar==None:
+        iv = f0*0+1
+    else:
+        iv = ivar[w]
+
+    def peaks(s):
+        ## find the amplitudes of the peaks with a linear fit
+        res = resolution(i0,ilines[:,None],s[:,None])
+        D = (f0*res).sum(axis=1)
+        M = res.dot(res.T)
+        A = linalg.inv(M).dot(D)
+        return A.T.dot(res)
+
+    def sigma(*p):
+        return sp.array(p)
+
+    def chi2(*p):
+        s = sigma(p)
+        res = peaks(s)
+        ret = (iv*(f0-res)**2).sum()
+        print sp.mean(s),ret
+        return ret
+
+    pinit={}
+    if p0 is None:
+        p0 = sp.ones(nlines)
+    pnames = ["sigma{}".format(i) for i in range(nlines)]
+    for i in range(nlines):
+        pinit['sigma'+str(i)]=p0[i]
+    kwds = {p:pinit[p] for p in pnames}
+    for p in pnames:
+        kwds["error_"+p]=0.1
+        kwds["limit_"+p]=(1/sp.sqrt(12),3)
+    mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=3,**kwds)
+    mig.migrad()
+
+    s0 = sp.array([mig.values[p] for p in pnames])
+    return i0,peaks(s0),mig.values.values()
 
 
 def fitArc(arcfile,camera,lambda_out=None):
@@ -394,6 +446,70 @@ def spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
         log.write("spectro perfected in: {} \n".format(t-t0))
         log.flush()
     return flux,ivar,reso
+
+
+def svd_spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
+    t0 = time.time()
+    ## compute R and F
+    R = sp.sqrt(iv)*re
+    R = R.T
+    F = sp.sqrt(iv)*fl
+
+    ## svd decomposition
+    u,s,vt = linalg.svd(R)
+    one = linalg.diagsvd(s*0+1,R.shape[0],R.shape[1])
+    s = linalg.diagsvd(s,R.shape[0],R.shape[1])
+
+    flux = vt.T.dot(one.T.dot(u.T.dot(F)))
+    Q = vt.T.dot(sp.sqrt(s.T.dot(s)).dot(vt))
+
+    norm = Q.sum(axis=1)
+    w=norm>0
+    Q[w,:] = Q[w,:]/norm[w,None]
+    flux[w]/=norm[w] 
+    ivar = norm**2
+
+    ## ndiag is such that the sum of the diagonals > 1-tol
+
+    ndiag=1
+    for i in range(Q.shape[0]):
+        imin = i-ndiag/2
+        if imin<0:imin=0
+        imax = i+ndiag/2
+        if imax>=Q.shape[1]:
+            imax = Q.shape[1]
+
+        frac=Q[i,imin:imax].sum()
+        while frac<1-tol:
+            ndiag+=2
+            imin = i-ndiag/2
+            if imin<0:imin=0
+            imax = i+ndiag/2
+            if imax>=Q.shape[1]:imax = Q.shape[1]
+            frac = Q[i,imin:imax].sum()
+
+    if ndiag>ndiag_max:
+        log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))
+        ndiag=ndiag_max
+    nbins = Q.shape[1]
+    reso = sp.zeros([ndiag,nbins])
+    for i in range(ndiag):
+        offset = ndiag/2-i
+        d = sp.diagonal(Q,offset=offset)
+        if offset<0:
+            reso[i,:len(d)] = d
+        else:
+            reso[i,nbins-len(d):nbins]=d
+
+    t = time.time()
+    sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
+    if log is not None:
+        log.write("\n final ndiag: {}\n".format(ndiag))
+        log.write("spectro perfected in: {} \n".format(t-t0))
+        log.flush()
+    return flux,ivar,reso
+
+
 def convert_air_to_vacuum(air_wave) :
     ## copied over from specex
     sigma2 = (1e4/air_wave)**2

@@ -1,4 +1,8 @@
-pro run_extract,yanny_name
+pro run_extract,mjd=mjd,plate=plate
+
+spplan2d,mjd=mjd
+yanny_name=getenv('BOSS_SPECTRO_REDUX')+'/'+getenv('RUN2D')+'/'+strtrim(string(plate),2)+'/spPlan2d-'+strtrim(string(plate),2)+'-'+strtrim(string(mjd),2)+'.par'
+print,yanny_name
 
 ;;; read yanny file
 print,yanny_name

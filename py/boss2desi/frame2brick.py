@@ -81,7 +81,6 @@ class brick:
             flux[fib]=f
             ivar[fib]=i
             re.append(r)
-            stop
 
         ndiags = sp.array([r.shape[0] for r in re])
         w = ivar.sum(axis=1)>0

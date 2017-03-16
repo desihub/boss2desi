@@ -94,7 +94,6 @@ class brick:
             nd = re[fib].shape[0]
             self.re[fib,(ndiag-nd)/2:(ndiag+nd)/2]=re[fib]
 
-        stop
         self.lam = wave_new
         self.flux = flux
         self.ivar = ivar

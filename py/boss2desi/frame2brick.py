@@ -9,7 +9,7 @@ import boss2desi.fibermap
 from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None,fibers=None):
 
         self.camera = camera
 
@@ -34,7 +34,10 @@ class brick:
             self.fm_names = desi_fibermap.fm_names
 
         index = sp.arange(wave.shape[1])
-        for fib in range(nspec):
+        if fibers==None:
+            fibers=range(nspec)
+
+        for fib in fibers:
             i0 = index
             if skylines is not None:
                 to=sp.loadtxt(skylines,usecols=(0,))
@@ -62,28 +65,37 @@ class brick:
             ## check that the centers of the resolution are within
             ## two pixels of a good pixel
 
-            centers = i_wave(wave_new)
-            wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
-            if wgood.sum()==0:
-                re.append(sp.zeros([2,nbins]))
-                continue
+            #centers = i_wave(wave_new)
+            #wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
+            #if wgood.sum()==0:
+            #    re.append(sp.zeros([2,nbins]))
+            #    continue
             #f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
-            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
-            flux[fib,wgood]=f
-            ivar[fib,wgood]=i
-            reso = sp.zeros([r.shape[0],nbins])
-            reso[:,wgood]=r
-            re.append(reso)
+            #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            #flux[fib,wgood]=f
+            #ivar[fib,wgood]=i
+            #reso = sp.zeros([r.shape[0],nbins])
+            #reso[:,wgood]=r
+            #re.append(reso)
+            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
+            flux[fib]=f
+            ivar[fib]=i
+            re.append(r)
+            stop
 
         ndiags = sp.array([r.shape[0] for r in re])
         w = ivar.sum(axis=1)>0
-        ndiag = max(ndiags[w])
+        try:
+            ndiag = max(ndiags[w])
+        except:
+            ndiag = max(ndiags)
         sys.stdout.write("max in diag {} in fiber {}\n".format(ndiag,sp.argmax(ndiags)))
         self.re = sp.zeros([nspec,ndiag,nbins])
         for fib in range(len(re)):
             nd = re[fib].shape[0]
             self.re[fib,(ndiag-nd)/2:(ndiag+nd)/2]=re[fib]
 
+        stop
         self.lam = wave_new
         self.flux = flux
         self.ivar = ivar

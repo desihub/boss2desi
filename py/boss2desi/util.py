@@ -539,7 +539,7 @@ def spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
     return flux,ivar,reso
 
 
-def svd_spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
+def svd_spectro_perf(fl,iv,re,log=None):
     t0 = time.time()
     ## compute R and F
     R = sp.sqrt(iv)*re
@@ -560,8 +560,15 @@ def svd_spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
     flux[w]/=norm[w] 
     ivar = norm**2
 
+    t = time.time()
+    sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
+    if log is not None:
+        log.write("\n final ndiag: {}\n".format(ndiag))
+        log.write("spectro perfected in: {} \n".format(t-t0))
+        log.flush()
+    return flux,ivar,Q
+'''
     ## ndiag is such that the sum of the diagonals > 1-tol
-
     ndiag=1
     for i in range(Q.shape[0]):
         imin = i-ndiag/2
@@ -580,7 +587,8 @@ def svd_spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
             frac = Q[i,imin:imax].sum()
 
     if ndiag>ndiag_max:
-        log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))
+        if log is not None:
+            log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))
         ndiag=ndiag_max
     nbins = Q.shape[1]
     reso = sp.zeros([ndiag,nbins])
@@ -591,14 +599,7 @@ def svd_spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
             reso[i,:len(d)] = d
         else:
             reso[i,nbins-len(d):nbins]=d
-
-    t = time.time()
-    sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
-    if log is not None:
-        log.write("\n final ndiag: {}\n".format(ndiag))
-        log.write("spectro perfected in: {} \n".format(t-t0))
-        log.flush()
-    return flux,ivar,reso
+'''
 
 
 def convert_air_to_vacuum(air_wave) :

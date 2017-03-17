@@ -9,7 +9,7 @@ import boss2desi.fibermap
 from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None,fibers=None):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
 
         self.camera = camera
 
@@ -65,22 +65,57 @@ class brick:
             ## check that the centers of the resolution are within
             ## two pixels of a good pixel
 
-            #centers = i_wave(wave_new)
-            #wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
-            #if wgood.sum()==0:
-            #    re.append(sp.zeros([2,nbins]))
-            #    continue
-            #f,i,r = util.spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
-            #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
-            #flux[fib,wgood]=f
-            #ivar[fib,wgood]=i
-            #reso = sp.zeros([r.shape[0],nbins])
-            #reso[:,wgood]=r
-            #re.append(reso)
-            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
-            flux[fib]=f
-            ivar[fib]=i
-            re.append(r)
+            centers = i_wave(wave_new)
+            wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
+            if wgood.sum()==0:
+                re.append(sp.zeros([2,nbins]))
+                continue
+
+            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            flux[fib,wgood]=f
+            ivar[fib,wgood]=i
+            R1 = sp.zeros([nbins,r.shape[1]])
+            R1[wgood,:] = r
+            R = sp.zeros([nbins,nbins])
+            R[:,wgood] = R1
+            ## extract the relevant diagonals from r
+            ## ndiag is such that the sum of the diagonals > 1-tol
+            ndiag=1
+            for i in range(R.shape[0]):
+                imin = i-ndiag/2
+                if imin<0:imin=0
+                imax = i+ndiag/2
+                if imax>=R.shape[1]:
+                    imax = R.shape[1]
+
+                frac=R[i,imin:imax].sum()
+                while frac<R[i].sum()-tol:
+                    ndiag+=2
+                    imin = i-ndiag/2
+                    if imin<0:imin=0
+                    imax = i+ndiag/2
+                    if imax>=R.shape[1]:imax = R.shape[1]
+                    frac = R[i,imin:imax].sum()
+                    print i,ndiag,frac
+                if ndiag>ndiag_max:
+                    if log is not None:
+                        log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))
+                    ndiag=ndiag_max
+                    break
+
+            nbins = R.shape[1]
+            reso = sp.zeros([ndiag,nbins])
+            for i in range(ndiag):
+                offset = ndiag/2-i
+                d = sp.diagonal(R,offset=offset)
+                if offset<0:
+                    reso[i,:len(d)] = d
+                else:
+                    reso[i,nbins-len(d):nbins]=d
+
+            ######################
+
+            re.append(reso)
 
         ndiags = sp.array([r.shape[0] for r in re])
         w = ivar.sum(axis=1)>0

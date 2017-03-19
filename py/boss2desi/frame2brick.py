@@ -103,6 +103,9 @@ class brick:
                     ndiag=ndiag_max
                     break
 
+    	    if log is not None:
+                log.write("\n final ndiag: {}\n".format(ndiag))
+                log.flush()
             nbins = R.shape[1]
             reso = sp.zeros([ndiag,nbins])
             for i in range(ndiag):

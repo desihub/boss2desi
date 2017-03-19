@@ -563,9 +563,7 @@ def svd_spectro_perf(fl,iv,re,log=None):
     t = time.time()
     sys.stdout.write("spectro perfected in: {} \n".format(t-t0))
     if log is not None:
-        log.write("\n final ndiag: {}\n".format(ndiag))
         log.write("spectro perfected in: {} \n".format(t-t0))
-        log.flush()
     return flux,ivar,Q
 '''
     ## ndiag is such that the sum of the diagonals > 1-tol

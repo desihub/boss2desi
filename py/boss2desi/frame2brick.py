@@ -96,7 +96,6 @@ class brick:
                     imax = i+ndiag/2
                     if imax>=R.shape[1]:imax = R.shape[1]
                     frac = R[i,imin:imax].sum()
-                    print i,ndiag,frac
                 if ndiag>ndiag_max:
                     if log is not None:
                         log.write("WARNING, reducing ndiag {} to {}".format(ndiag,ndiag_max))

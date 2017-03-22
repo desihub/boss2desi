@@ -37,24 +37,22 @@ class brick:
         if fibers==None:
             fibers=range(nspec)
 
+        i0 = sp.zeros(wave.shape)
+        for i in range(nspec):
+            i0[i]=index
+
+        if skylines is not None:
+            to=sp.loadtxt(skylines,usecols=(0,))
+            w = (to>wave.min()) & (to<wave.max())
+            ilines=sp.zeros([wave.shape[0],w.sum()])
+            for fib in range(nspec):
+                ilines[fib]=interp1d(wave[fib],index)(to[w])
+            i0,_,_,_=util.fitSkyLinesGlobally(fl,iv,ilines,deg_epsilon=4)
+
         for fib in fibers:
-            i0 = index
-            if skylines is not None:
-                to=sp.loadtxt(skylines,usecols=(0,))
-                w = (to>wave[fib].min()) & (to<wave[fib].max())
-                ilines=interp1d(wave[fib],index)(to[w])
-                try:
-                    i0,ep,eta = util.fitSkyLines(fl[fib],iv[fib],ilines)
-                    sys.stdout.write("{} {} {}\n".format(fib,ep,eta))
-                    if log is not None:
-                        log.write("{} {} {}\n".format(fib,ep,eta))
-                except:
-                    sys.stdout.write("fitSkyLines failed in fib {}\n".format(fib))
-                    if log is not None:
-                        log.write("fit skylines failed in fib {}\n".format(fib))
             i_wave = interp1d(wave[fib,:],index)
             wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())
-            res = util.resolution(i0[wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
+            res = util.resolution(i0[fib,wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
             norm = res.sum(axis=1)
             res/=norm[:,None]
 
@@ -66,7 +64,7 @@ class brick:
             ## two pixels of a good pixel
 
             centers = i_wave(wave_new)
-            wgood = abs(centers-i0[wlam & w,None]).min(axis=0)<2
+            wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<2
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue

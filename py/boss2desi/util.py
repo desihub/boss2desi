@@ -340,11 +340,15 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
         dbar = (iv*fl).sum(axis=1)
         dxbar= (iv*fl*f).sum(axis=1)
         M = [ sp.array([ [1,xbar[l]], [xbar[l],x2bar[l]] ]) for l in range(nlines)]
-        C = [ linalg.inv(M[l]).dot([dbar[l],dxbar[l]]) for l in range(nlines)]
+        try:
+            C = [ linalg.inv(M[l]).dot([dbar[l],dxbar[l]]) for l in range(nlines)]
+        except:
+            stop
         C = sp.array(C)
         B = C[:,0,None]
         A = C[:,1,None]
         fit = B+A*f
+
         return fit
 
     def line_shift(i,epsilon,eta):
@@ -384,92 +388,120 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
     i = line_shift(index,epsilon,eta)
     return i,epsilon,eta
 
-def fitSkyLinesGlobally(flux,ivar,ilines,tol=10):
+def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None):
     '''
     fit shift and dilation parameters to fix drifts in the wavelength solution from the arc
     assume shift, dilatation and sigma are quadratic with fiber number
     '''
     
-    nfib = flux.shape[0]
-    nlines = ilines.shape[1]
-    nbins = flux.shape[1]
-    index = sp.arange(nbins)
-    fl = []
-    iv = []
-    x = []
+    fibers = sp.arange(flux.shape[0])
+    index = sp.arange(flux.shape[1])
+    ## works for 500 fibers and degree 2
+    nodes_eps = fibers[0]+(fibers[-1]-fibers[0])*sp.arange(deg_epsilon+1,dtype=float)/(deg_epsilon-1)
+    pol_ep = sp.ones([deg_epsilon+1,len(fibers)])
+    for i in range(deg_epsilon+1):
+        for j in range(deg_epsilon+1):
+            if j!=i:
+                pol_ep[i]*=(fibers-nodes_eps[j])/(nodes_eps[i]-nodes_eps[j])
 
-    for fib in range(nfib):
-        fl.append([])
-        iv.append([])
-        x.append([])
-        for i in range(nlines):
-            w = abs(index-ilines[fib,i]) < tol
-            norm = ivar[w].sum()
-            if norm==0:
-                continue
-        
-            fl[fib].append(flux[w])
-            iv[fib].append(ivar[w]/ivar[w].sum())
-            x[fib].append(index[w])
+    def epsilon(p):
+        return (sp.array(p)[:,None]*pol_ep).sum(axis=0)
 
-    fl = sp.array(fl)
-    iv = sp.array(iv)
-    x = sp.array(x)
+    ## works for 500 fibers and degree 1
+    def eta(fib,p):
+        et=p[0]*(499.-fib)/499.
+        et+=p[1]*fib/499.
 
-    def peak(i,i0,sigma):
-        f = sp.exp(-(i-i0)**2/2/sigma**2)
-        xbar = (iv*f).sum(axis=1)
-        x2bar = (iv*f**2).sum(axis=1)
-        dbar = (iv*fl).sum(axis=1)
-        dxbar= (iv*fl*f).sum(axis=1)
-        M = [ sp.array([ [1,xbar[l]], [xbar[l],x2bar[l]] ]) for l in range(nlines)]
-        C = [ linalg.inv(M[l]).dot([dbar[l],dxbar[l]]) for l in range(nlines)]
-        C = sp.array(C)
-        B = C[:,0,None]
-        A = C[:,1,None]
-        fit = B+A*f
+        return et
+    
+    ## fit constant and amplitude for a given peak
+    def peak(x,i0,sigma,fl,iv):
+        f = sp.exp(-(x-i0)**2/2/sigma**2)
+        xbar = (iv*f).sum()
+        x2bar = (iv*f**2).sum()
+        dbar = (iv*fl).sum()
+        dxbar= (iv*fl*f).sum()
+        M = sp.zeros([2,2])
+        C = sp.zeros(2)
+        M[0,0]=iv.sum()
+        M[1,0]=xbar
+        M[0,1]=xbar
+        M[1,1]=x2bar
+        C[0]=dbar
+        C[1]=dxbar
+
+        try:
+            C = linalg.inv(M).dot(C)
+        except:
+            stop
+        A = C[0]
+        B = C[1]
+        fit = A+B*f
         return fit
 
-    def line_shift(i,epsilon,eta):
-        return epsilon+(1+eta)*i
-
+    ok=sp.ones(len(fibers),dtype=bool)
     def chi2(*p):
-        p = sp.array(p)
-        epsilon = pars_to_epsilon(p)
-        eta = pars_to_eta(p)
-        sigma = pars_to_sigma(p)
-        chisq=0.
-        for fib in range(nfib):
-            i = line_shift(x[fib],epsilon[fib],eta[fib])
-            try:
-                peaks = peak(i,ilines[fib,:,None],sigma[fib,:,None])
-            except:
+        p_ep = p[0:nep]
+        p_et = p[nep:nep+net]
+        sigma = p[nep+net]
+        ep = epsilon(p_ep)
+        et = eta(fibers,p_et)
+        chi=0
+        for fib in fibers:
+            il = ilines[fib]
+            wall = abs(index-il[:,None])<tol
+            if not ok[fib]:
                 continue
-            chisq += ((fl-peaks)**2*iv).sum()
-        return chisq
+            try:
+                for i,w in enumerate(wall):
+                    fit=peak(ep[fib]+(1+et[fib])*index[w],il[i],sigma,flux[fib,w],ivar[fib,w])
+                    chi += ((flux[fib,w]-fit)**2*ivar[fib,w]).sum()
+            except:
+                sys.stderr.write("fit failed in fiber {}\n".format(fib))
+                if log is not None:
+                    log.write("fit failed in fiber {}\n".format(fib))
+                ok[fib]=False
 
-    pars=["epsilon","eta"]
-    kwds={"epsilon":0.,"eta":0.,"error_epsilon":0.1,"error_eta":1e-4}
-    kwds["limit_epsilon"]=(-2,2)
-    kwds["limit_eta"]=(-1e-3,1e-3)
-    for i in range(nlines):
-        p = "sigma"+str(i)
-        p0 = 1.
-        dp0=0.5
-        kwds[p]=p0
-        kwds["error_"+p]=dp0
-        kwds["limit_"+p]=(1./sp.sqrt(12),2.)
-        pars.append(p)
-#    kwds["fix_epsilon"]=True
-#    kwds["fix_eta"]=True
-    mig = iminuit.Minuit(chi2,forced_parameters=pars,errordef=1,print_level=0,**kwds)
+        return chi
+
+    nep=deg_epsilon+1
+    pars=[]
+    for i in range(nep):
+        pars.append("a{}_ep".format(i))
+    net=deg_eta+1
+    for i in range(net):
+        pars.append("a{}_et".format(i))
+    pars.append("sigma")
+    kwds={}
+    for p in pars:
+        kwds[p]=0.
+        kwds["error_"+p]=0.01
+        kwds["limit_"+p]=(-2,2)
+
+    kwds["sigma"]=1.
+    kwds["error_sigma"]=0.1
+    kwds["limit_sigma"]=(1./sp.sqrt(12),3)
+    mig = iminuit.Minuit(chi2,forced_parameters=pars,errordef=1,print_level=3,**kwds)
     mig.migrad()
-    epsilon = mig.values["epsilon"]
-    eta = mig.values["eta"]
-    sigma = [mig.values["sigma"+str(i)] for i in range(nlines)]
-    sigma = sp.array(sigma)
-    i = line_shift(index,epsilon,eta)
-    return i,epsilon,eta
+
+    pvals = [mig.values[p] for p in pars]
+    ep = epsilon(pvals[0:nep])
+    et = eta(fibers,pvals[nep:nep+net])
+    sigma=pvals[nep+net]
+
+    peaks = sp.zeros(flux.shape)
+    index = ep[:,None]+(1+et[:,None])*index
+    for fib in fibers:
+        il = ilines[fib]
+        wall = abs(index[fib]-il[:,None])<tol
+        for i,w in enumerate(wall):
+            i0=ilines[fib,i]
+            try:
+                peaks[fib,w]=peak(index[fib,w],i0,sigma,flux[fib,w],ivar[fib,w])
+            except:
+                pass
+
+    return index,ep,et,peaks
 
 def spectro_perf(fl,iv,re,tol=1e-3,log=None,ndiag_max=27):
     t0 = time.time()

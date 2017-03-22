@@ -70,8 +70,12 @@ class brick:
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-
-            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+	    try:
+                f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            except:
+                f=sp.zeros(wgood.sum())
+                i=sp.zeros(wgood.sum())
+                r=sp.zeros([wgood.sum(),wgood.sum()])
             flux[fib,wgood]=f
             ivar[fib,wgood]=i
             R1 = sp.zeros([nbins,r.shape[1]])

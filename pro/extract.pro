@@ -1,4 +1,4 @@
-pro extract, inname,arcname,flatname,plugfile,outname,mjd=mjd,plate=plate
+pro extract, inname,arcname,flatname,plugfile,outname,mjd=mjd,plate=plate,final_highrej=final_highrej,final_lowrej=final_lowrej
 
 ; need wset xpeak lambda xsol fflat fibermask
 ; [transpose(lambda), xpeak], arcinfofile
@@ -134,8 +134,8 @@ nterms = n_elements(wfixed)
                                 ; (6) Final extraction
 splog, 'Step 6: Final Object extraction'
 
-highrej = 4
-lowrej  = 4
+if keyword_set(final_highrej) then highrej = final_highrej else highrej = 4
+if keyword_set(final_lowrej) then lowrej  = final_lowrej else lowrej=4
 
 wfixed = [1]               ; Fit to height only (fixed width + center)
 nterms = n_elements(wfixed)

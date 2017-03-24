@@ -26,7 +26,7 @@ for i=0,n_elements(flatnames)-1 do spFlat[i]='spFlat'+strsplit(flatnames[i],'sdR
 
 for i=0,n_elements(arcnames)-1 do begin
     outname = 'arc'+strsplit(arcnames[i],'sdR',/extract)+'s'
-    extract,arcnames[i]+'.gz',spArc[i],spFlat[i],'',outname,mjd=string(mjd),plate=string(plate)
+    extract,arcnames[i]+'.gz',spArc[i],spFlat[i],'',outname,mjd=string(mjd),plate=string(plate),final_highrej=100,final_lowrej=100
 endfor
 
 for i=0,n_elements(flatnames)-1 do begin

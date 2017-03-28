@@ -53,7 +53,7 @@ if __name__=="__main__":
         log = open(args.log,"w")
 
     if args.wdisp is None:
-        wdisp,ok = util.newFitArc(args.arc,wave_new,args.arclines,log=log,deg=4)
+        wdisp,ok,_ = util.newFitArc(args.arc,wave_new,args.arclines,log=log,deg=4)
     else:
         f=open(args.wdisp)
         ok=f.readline()

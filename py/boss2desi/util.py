@@ -10,10 +10,11 @@ from matplotlib import pyplot as pp
 import iminuit
 import traceback
 
-def resolution(i,i0,sigma):
+def resolution(i,i0,sigma,dpix=sp.sqrt(2)):
     ## This is the resolution in pixel units
     ## integrate the gaussian over 1 pixel
-    res = (erf((i-i0+0.5)/sigma/sp.sqrt(2)) - erf((i-i0-0.5)/sigma/sp.sqrt(2)))*0.5*sigma
+    res = (erf((i-i0+dpix)/sigma/sp.sqrt(2)) - erf((i-i0-dpix)/sigma/sp.sqrt(2)))*0.5*sigma
+    ##res = (erf((i-i0+.5)/sigma/sp.sqrt(2)) - erf((i-i0-.5)/sigma/sp.sqrt(2)))*0.5*sigma
     ##res = sp.exp(-(i-i0)**2/2/sigma**2)
     return res
 
@@ -52,9 +53,10 @@ def fitPeaks(index,flux,npeaks,i0,w0,debug=False):
     ## now mask and findPeak again
     fitPeaks(index[~w],flux[~w],npeaks-1,i0,w0,debug=debug)
 
-def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None,deg=None):
+def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None,deg=None,deg_bb=None,tol=None):
     harc = fitsio.FITS(arcfile)
     flux = harc[0].read()
+    ivar = harc[1].read()
     nfib = flux.shape[0]
     wave = 10**harc[3].read()
     ok = sp.ones(nfib,dtype=bool)
@@ -65,15 +67,15 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
 
     wdisp = np.zeros([nfib,len(wave_new)])
     to = np.loadtxt(arclines,usecols=(0,))
+    index = np.arange(flux.shape[1])
     if fiber==None:
         fiber=range(nfib)
     for fib in fiber:
         sys.stderr.write("fitting arc in fiber {}\n ".format(fib))
-        index = np.arange(flux.shape[1])
         i = interp1d(wave[fib,:],index)
-        w = (to>wave[fib,:].min()) & (to<wave[fib,:].max())
+        w = (to>wave_new.min()) & (to<wave_new.max())
         try:
-            wd,a,b,pars = fitDisp(flux[fib,:],i(to[w]),deg=deg,log=log)
+            wd,a,b,pars,chi2,ndf,dpix = fitDisp(flux[fib,:],ivar[fib,:],i(to[w]),deg=deg,log=log,deg_bb=deg_bb,tol=tol)
 
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
@@ -85,12 +87,13 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
                 log.flush()
             sys.stderr.write("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
             if debug:
+                sys.stderr.write("chi2: {}, ndf: {} ".format(chi2,ndf))
                 pp.figure(1)
                 pp.plot(wave[fib,a],b)
                 pp.plot(wave[fib,:],flux[fib,:])
                 pp.grid()
-                #for l in arclines:
-                #    pp.plot(l+sp.zeros(2),flux[fib,:].max()*sp.arange(2),"k--")
+                for l in to:
+                    pp.plot(l+sp.zeros(2),flux[fib,:].max()*sp.arange(2),"k--")
                 pp.show()
                 pp.draw()
                 x=raw_input()
@@ -121,14 +124,18 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
                 fout.write("{} ".format(wdisp[fib,i]))
             fout.write("\n")
         fout.close()
-    return wdisp,ok
+    return wdisp,ok,dpix
         
-def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
+def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     ''' 
     given a flux from the arc lamps fit sigmas
     '''
     if deg is None:
         deg=2
+    if deg_bb is None:
+        deg_bb=3
+    if tol == None:
+        tol = 10
     nbins = len(flux)
     index = sp.arange(nbins)
     imax = 1.*nbins
@@ -149,23 +156,34 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
     w=dlam<tol
     i0=index[w]
     f0=flux[w]
+    eta=0.
+    iv=ivar[w]/((eta*f0)**2*ivar[w]+1)
 
     def sigma(p):
         s=p.dot(pol)
         return sp.exp(s)
 
-    def peaks(s):
+    def peaks(s,fl,dpix=sp.sqrt(2)):
         ## find the amplitudes of the peaks with a linear fit
-        res = resolution(i0,ilines[:,None],s[:,None])
-        D = (f0*res).sum(axis=1)
-        M = res.dot(res.T)
+        res = resolution(i0,ilines[:,None],s[:,None],dpix=dpix)
+        ivres = sp.sqrt(iv)*res
+        D = (sp.sqrt(iv)*fl*ivres).sum(axis=1)
+        M = ivres.dot(ivres.T)
         A = linalg.inv(M).dot(D)
+
         return A.T.dot(res)
 
+    def broadband(p):
+        ret = p[0]+i0*0
+        for i in range(1,deg_bb+1):
+            ret += p[i]*i0**i
+        return ret
+
     def chi2(*p):
-        s = sigma(sp.array(p))
-        res = peaks(s)
-        ret = ((f0-res)**2).sum()
+        s = sigma(sp.array(p[:deg+1]))
+        bb = broadband(p[deg+1:])
+        res = peaks(s,f0-bb,dpix=p[-1])+bb
+        ret = (iv*(f0-res)**2).sum()
         return ret
     pinit={}
     if p0 is None:
@@ -177,18 +195,33 @@ def fitDisp(flux,ilines,tol=10,deg=2,log=None,p0=None):
     for p in pnames:
         kwds["error_"+p]=0.1
         kwds["limit_"+p]=(-0.5*sp.log(12.),sp.log(3))
+
+    for i in range(deg_bb+1):
+        p="bb_{}".format(i)
+        pnames.append(p)
+        kwds[p]=0.
+        kwds["error_"+p]=0.1
+
+    pnames.append("dpix")
+    kwds["dpix"]=0.5
+    kwds["error_dpix"]=0.1*sp.sqrt(2)
+    kwds["fix_dpix"]=True
+
     mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
     mig.migrad()
+    dpix=mig.values["dpix"]
 
-    s0 = sigma(sp.array([mig.values[p] for p in pnames]))
+    pvals = sp.array([mig.values[p] for p in pnames])
+    s0 = sigma(pvals[:deg+1])
     pol = sp.ones([deg+1,nbins])
     u = (2.*index-(imin+imax))/(imax-imin)
     for i in range(deg+1):
         for j in range(deg+1):
             if j==i:continue
             pol[i]*=(u-node[j])/(node[i]-node[j])
-    s1 = sigma(sp.array([mig.values[p] for p in pnames]))
-    return s1,i0,peaks(s0),mig.values.values()
+    s1 = sigma(pvals[:deg+1])
+    bb = broadband(pvals[deg+1:])
+    return s1,i0,peaks(s0,f0-bb,dpix)+bb,mig.values.values(),mig.fval,(iv>0).sum()-len(pnames),dpix
 
 def fitArcLines(flux,ilines,tol=10,log=None,p0=None,ivar=None):
     ''' 

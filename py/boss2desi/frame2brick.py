@@ -65,17 +65,21 @@ class brick:
 
             centers = i_wave(wave_new)
             wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<2
+            mask[fib,~wgood]=1
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
 
-            f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
-            flux[fib,wgood]=f
-            ivar[fib,wgood]=i
-            R1 = sp.zeros([nbins,r.shape[1]])
-            R1[wgood,:] = r
-            R = sp.zeros([nbins,nbins])
-            R[:,wgood] = R1
+            #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            #flux[fib,wgood]=f
+            #ivar[fib,wgood]=i
+            #R1 = sp.zeros([nbins,r.shape[1]])
+            #R1[wgood,:] = r
+            #R = sp.zeros([nbins,nbins])
+            #R[:,wgood] = R1
+            f,i,R = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
+            flux[fib]=f
+            ivar[fib]=i
             ## extract the relevant diagonals from r
             ## ndiag is such that the sum of the diagonals > 1-tol
             ndiag=1

@@ -15,7 +15,7 @@
   3663.284    100.0  GOOD  Hg I ## added by ngbusca
   3901.867     50.0  BLEND  Hg I 
   3906.372    100.0  BLEND  Hg I
-  3983.839   1000.0  GOOD   Hg II
+  ## 3983.839   1000.0  GOOD   Hg II ngbusca: invisible
   4042.642   500 BLEND Ne I ## added by ngbusca
   4046.572  20000.0  GOOD   Hg I
   4077.838   2000.0  GOOD   Hg I
@@ -24,26 +24,30 @@
   4339.22     100.0  GOOD   Hg I
   4347.506    100.0  GOOD   Hg I
   4358.337  50000.0  GOOD   Hg I
-  4412.989    100.0  GOOD   Cd I
+  #4412.989    100.0  GOOD   Cd I ngbusca: invisible
   4662.352    100.0  GOOD   Cd I
   4678.149   2000.0  GOOD   Cd I
   4799.912  10000.0  GOOD   Cd I
-  4861.33     100.0  BLEND  H I
+  #4861.33     100.0  BLEND  H I ngbusca: invisible
   4916.07     100.0  GOOD   Hg I
   5085.822  17000.0  GOOD   Cd I
-  5154.4271   100.0  BLEND  Ne I
-  5154.660    100.0  BLEND  Cd I
-  5330.7775   100.0  GOOD   Ne I
+  5154.4271   100.0  BLEND  Ne I 
+  5154.660    100.0  BLEND  Cd I 
+  5330.7775   100.0  GOOD   Ne I 
+  5333.3083   500.0  GOOD   Ne I ## added by ngbusca
   5341.0938   100.0  GOOD   Ne I
-  5354.600    100.0  UNKNOWN
+  5343.2834   6000.  GOOD   Ne I ## added by ngbusca
+  #5354.600    100.0  UNKNOWN
+  5355.1640 1500.0 GOOD Ne I ## added by ngbusca
+  5355.4236 1500.0 GOOD Ne I ## added by ngbusca
   5400.5616  1000.0  GOOD   Ne I
-  5460.753  10000.0  GOOD   Hg I
-  5656.6588   100.0  GOOD   Ne I
-  5675.86     100.0  GOOD   Hg I
-  5689.8163   100.0  GOOD   Ne I
-  5719.5300   100.0  GOOD   Ne I
-  5748.2985   100.0  BLEND  Ne I
-  5748.6446   100.0  BLEND  Ne I
+  ## 5460.753  10000.0  GOOD   Hg I ngbusca: saturated?
+  ## 5656.6588   100.0  GOOD   Ne I ngbusca: invisible
+  ## 5675.86     100.0  GOOD   Hg I ngbusca: invisible
+  ## 5689.8163   100.0  GOOD   Ne I ngbusca: invisible
+  ## 5719.5300   100.0  GOOD   Ne I ngbusca: invisible
+  ## 5748.2985   100.0  BLEND  Ne I ngbusca: invisible
+  ## 5748.6446   100.0  BLEND  Ne I ngbusca: invisible
   5769.598   1500.0  GOOD   Hg I
   5790.663   1500.0  GOOD   Hg I
   5803.78     100.0  BLEND  Hg I
@@ -93,10 +97,11 @@
   7635.106  10000.0  GOOD   Ar I DPF - noisy
   7723.761   2000.0  BLEND  Ar I
   7724.207   2000.0  BLEND  Ar I
-#  7943.180    800.0  GOOD   Ne I
+  7728.825   30.0    GOOD Hg I ## added by ngbusca
+  7943.180    800.0  GOOD   Ne I ## added by ngbusca
   7948.176   2500.0  BLEND  Ar I
-  8006.157   1000.0  BLEND  Ar I
-  8014.786   2000.0  GOOD   Ar I
+  ##8006.157   1000.0  BLEND  Ar I ngbusca: invisible
+  ##8014.786   2000.0  GOOD   Ar I ngbusca: invisible
   8103.693   3000.0  GOOD   Ar I
   8115.311  13000.0  BLEND  Ar I
 #  8118.549   4000.0  GOOD   Ne I
@@ -124,7 +129,9 @@
   8919.5007   700.0  GOOD   Ne I
   9122.9674  6000.0  GOOD   Ar I
   9148.67    3000.0  BLEND  Ne I
-  9201.759    900.0  GOOD   Ne I
+  9201.759   8900.0  GOOD   Ne I
+  9220.0598  6000.0  GOOD   Ne I ## added by ngbusca
+  9221.5802  2200.0  GOOD   Ne I ## added by ngbusca
   9226.69    1000.0  BLEND  Ne I
   9300.853    700.0  GOOD   Ne I
   9313.1386   150.0  GOOD   Ne I # faint
@@ -136,6 +143,6 @@
   9547.40     250.0  GOOD   Ne I
   9657.786     50.0  GOOD   Ar I
   9665.424    900.0  GOOD   Ne I
-  9784.503     50.0  GOOD   Ar I
+  ##9784.503     50.0  GOOD   Ar I ngbusca:invisible
  10139.75   16000.0  GOOD   Hg
  10390.0     2000.0  UNKNOWN

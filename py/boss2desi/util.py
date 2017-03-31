@@ -74,8 +74,12 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         sys.stderr.write("fitting arc in fiber {}\n ".format(fib))
         i = interp1d(wave[fib,:],index)
         w = (to>wave_new.min()) & (to<wave_new.max())
-        try:
+        try: 
+            t0 = time.time()
+            sys.stderr.write("fitDisp\n")
             wd,a,b,pars,chi2,ndf,dpix = fitDisp(flux[fib,:],ivar[fib,:],i(to[w]),deg=deg,log=log,deg_bb=deg_bb,tol=tol)
+            sys.stderr.write("fit Disp done in {}".format(time.time()-t0))
+            print "fit Disp in ",time.time()-t0
 
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
@@ -208,7 +212,9 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     kwds["fix_dpix"]=True
 
     mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
+    t0 = time.time()
     mig.migrad()
+    sys.stderr.write("mig in {}\n".format(time.time()-t0))
     dpix=mig.values["dpix"]
 
     pvals = sp.array([mig.values[p] for p in pnames])

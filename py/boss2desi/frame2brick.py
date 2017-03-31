@@ -60,8 +60,8 @@ class brick:
             if w.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-            ## check that the centers of the resolution are within
-            ## two pixels of a good pixel
+            ## check that the centers of the resolution are at less than 
+            ## half a pixel of a good pixel
 
             centers = i_wave(wave_new)
             wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<0.51
@@ -77,7 +77,13 @@ class brick:
             #R1[wgood,:] = r
             #R = sp.zeros([nbins,nbins])
             #R[:,wgood] = R1
-            f,i,R = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
+            try:
+                f,i,R = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
+            except:
+                if log is not None:
+                    log.write("svd failed in fib {}\n".format(fib))
+                re.append(sp.zeros([2,nbins]))
+                continue
             flux[fib]=f
             ivar[fib]=i
             ## extract the relevant diagonals from r

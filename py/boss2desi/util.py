@@ -66,6 +66,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
     ok[w] = False
 
     wdisp = np.zeros([nfib,len(wave_new)])
+    dpix  = np.zeros(nfib)
     to = np.loadtxt(arclines,usecols=(0,))
     index = np.arange(flux.shape[1])
     if fiber==None:
@@ -77,7 +78,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
         try: 
             t0 = time.time()
             sys.stderr.write("fitDisp\n")
-            wd,a,b,pars,chi2,ndf,dpix = fitDisp(flux[fib,:],ivar[fib,:],i(to[w]),deg=deg,log=log,deg_bb=deg_bb,tol=tol)
+            wd,a,b,pars,chi2,ndf,dpix[fib] = fitDisp(flux[fib,:],ivar[fib,:],i(to[w]),deg=deg,log=log,deg_bb=deg_bb,tol=tol)
             sys.stderr.write("fit Disp done in {}".format(time.time()-t0))
             print "fit Disp in ",time.time()-t0
 
@@ -89,7 +90,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
                     log.write("{} ".format(p))
                 log.write("\n")
                 log.flush()
-            sys.stderr.write("mean(wdisp) in fib {} {}\n".format(fib,wdisp[fib,:].mean()))
+            sys.stderr.write("mean(wdisp) in fib {} {}, dpix {}\n".format(fib,wdisp[fib,:].mean(),dpix[fib]))
             if debug:
                 sys.stderr.write("chi2: {}, ndf: {} ".format(chi2,ndf))
                 pp.figure(1)
@@ -108,7 +109,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
             sys.stdout.write("wdisp fit in fiber {} failed\n".format(fib))
             if debug:
                 traceback.print_exc()
-                return wdisp,ok
+                return wdisp,ok,dpix
             wdisp[fib,:]=0.1
             ok[fib]=False
             if log is not None:
@@ -209,7 +210,7 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     pnames.append("dpix")
     kwds["dpix"]=0.5
     kwds["error_dpix"]=0.1*sp.sqrt(2)
-    kwds["fix_dpix"]=True
+    kwds["limit_dpix"]=(0.,3)
 
     mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
     t0 = time.time()

@@ -9,7 +9,7 @@ import boss2desi.fibermap
 from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,dpix,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
 
         self.camera = camera
 
@@ -52,7 +52,7 @@ class brick:
         for fib in fibers:
             i_wave = interp1d(wave[fib,:],index)
             wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())
-            res = util.resolution(i0[fib,wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
+            res = util.resolution(i0[fib,wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None],dpix=dpix[fib])
             norm = res.sum(axis=1)
             res/=norm[:,None]
 

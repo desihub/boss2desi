@@ -20,6 +20,8 @@ class brick:
         ## turn off bits coming from flat-fielding
         ma = ma & (~2**17)
 
+	iv *= ma==0
+
         nspec = fl.shape[0]
         nbins = len(wave_new)
         flux = sp.zeros([nspec,nbins])

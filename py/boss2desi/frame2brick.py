@@ -84,10 +84,11 @@ class brick:
             except:
                 if log is not None:
                     log.write("svd failed in fib {}\n".format(fib))
-                re.append(sp.zeros([2,nbins]))
+                re.append(sp.zeros([3,nbins]))
                 continue
             flux[fib]=f
             ivar[fib]=i
+
             ## extract the relevant diagonals from r
             ## ndiag is such that the sum of the diagonals > 1-tol
             ndiag=1

@@ -9,7 +9,7 @@ import boss2desi.fibermap
 from boss2desi import util
 
 class brick:
-    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
+    def __init__(self,fl,iv,ma,wave,wave_new,wdisp,dpix,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
 
         self.camera = camera
 
@@ -19,6 +19,8 @@ class brick:
 
         ## turn off bits coming from flat-fielding
         ma = ma & (~2**17)
+
+	iv *= ma==0
 
         nspec = fl.shape[0]
         nbins = len(wave_new)
@@ -52,7 +54,7 @@ class brick:
         for fib in fibers:
             i_wave = interp1d(wave[fib,:],index)
             wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())
-            res = util.resolution(i0[fib,wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None])
+            res = util.resolution(i0[fib,wlam],i_wave(wave_new[:,None]),wdisp[fib,:,None],dpix=dpix[fib])
             norm = res.sum(axis=1)
             res/=norm[:,None]
 
@@ -60,26 +62,33 @@ class brick:
             if w.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-            ## check that the centers of the resolution are within
-            ## two pixels of a good pixel
+            ## check that the centers of the resolution are at less than 
+            ## half a pixel of a good pixel
 
             centers = i_wave(wave_new)
-            wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<2
+            wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<0.51
+            mask[fib,~wgood]=1
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))
                 continue
-	    try:
-                f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+
+            #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
+            #flux[fib,wgood]=f
+            #ivar[fib,wgood]=i
+            #R1 = sp.zeros([nbins,r.shape[1]])
+            #R1[wgood,:] = r
+            #R = sp.zeros([nbins,nbins])
+            #R[:,wgood] = R1
+            try:
+                f,i,R = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res,log=log)
             except:
-                f=sp.zeros(wgood.sum())
-                i=sp.zeros(wgood.sum())
-                r=sp.zeros([wgood.sum(),wgood.sum()])
-            flux[fib,wgood]=f
-            ivar[fib,wgood]=i
-            R1 = sp.zeros([nbins,r.shape[1]])
-            R1[wgood,:] = r
-            R = sp.zeros([nbins,nbins])
-            R[:,wgood] = R1
+                if log is not None:
+                    log.write("svd failed in fib {}\n".format(fib))
+                re.append(sp.zeros([3,nbins]))
+                continue
+            flux[fib]=f
+            ivar[fib]=i
+
             ## extract the relevant diagonals from r
             ## ndiag is such that the sum of the diagonals > 1-tol
             ndiag=1

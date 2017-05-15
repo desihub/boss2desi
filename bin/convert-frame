@@ -24,6 +24,8 @@ if __name__=="__main__":
     
     parser.add_argument("--out",type=str,default=None,required=True,help="output file")
     parser.add_argument("--log",type=str,default=None,required=False,help="log file")
+    parser.add_argument("--wdisp-deg",type=int,default=4,required=False,help="degree of polynomial for evolution of wdisp with wavelength")
+    parser.add_argument("--wdisp-deg-bb",type=int,default=4,required=False,help="degree of polynomial for evolution of wdisp broadband with wavelength")
 
     args=parser.parse_args()
 
@@ -53,7 +55,7 @@ if __name__=="__main__":
         log = open(args.log,"w")
 
     if args.wdisp is None:
-        wdisp,ok = util.newFitArc(args.arc,wave_new,args.arclines,log=log,deg=4)
+        wdisp,ok,dpix = util.newFitArc(args.arc,wave_new,args.arclines,log=log,deg=args.wdisp_deg,deg_bb=args.wdisp_deg_bb)
     else:
         f=open(args.wdisp)
         ok=f.readline()
@@ -69,7 +71,7 @@ if __name__=="__main__":
 
     ivar[~ok,:]=0.
     ## The arc and the frame have the same wavelength solution
-    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,camera,fibermap,skylines=args.skylines,log=log)
+    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,dpix,camera,fibermap,skylines=args.skylines,log=log)
 
     if log is not None:
         log.close()

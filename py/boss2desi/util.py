@@ -473,13 +473,12 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         try:
             C = linalg.inv(M).dot(C)
         except:
-            stop
+            return fl*0
         A = C[0]
         B = C[1]
         fit = A+B*f
         return fit
 
-    ok=sp.ones(len(fibers),dtype=bool)
     def chi2(*p):
         p_ep = p[0:nep]
         p_et = p[nep:nep+net]
@@ -490,17 +489,9 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         for fib in fibers:
             il = ilines[fib]
             wall = abs(index-il[:,None])<tol
-            if not ok[fib]:
-                continue
-            try:
-                for i,w in enumerate(wall):
-                    fit=peak(ep[fib]+(1+et[fib])*index[w],il[i],sigma,flux[fib,w],ivar[fib,w])
-                    chi += ((flux[fib,w]-fit)**2*ivar[fib,w]).sum()
-            except:
-                sys.stderr.write("fit failed in fiber {}\n".format(fib))
-                if log is not None:
-                    log.write("fit failed in fiber {}\n".format(fib))
-                ok[fib]=False
+            for i,w in enumerate(wall):
+                fit=peak(ep[fib]+(1+et[fib])*index[w],il[i],sigma,flux[fib,w],ivar[fib,w])
+                chi += ((flux[fib,w]-fit)**2*ivar[fib,w]).sum()
 
         return chi
 
@@ -536,10 +527,7 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         wall = abs(index[fib]-il[:,None])<tol
         for i,w in enumerate(wall):
             i0=ilines[fib,i]
-            try:
-                peaks[fib,w]=peak(index[fib,w],i0,sigma,flux[fib,w],ivar[fib,w])
-            except:
-                pass
+            peaks[fib,w]=peak(index[fib,w],i0,sigma,flux[fib,w],ivar[fib,w])
 
     return index,ep,et,peaks
 

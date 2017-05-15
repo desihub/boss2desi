@@ -17,7 +17,7 @@ if __name__=="__main__":
     parser.add_argument("--arc",type=str,default=None,required=True,help="determine wdisp from this file instead of cframe")
     parser.add_argument("--lambda-min",type=float,default=3500,required=False,help="minimum wavelength")
     parser.add_argument("--lambda-max",type=float,default=6500,required=False,help="maximum wavelength")
-    parser.add_argument("--dlam",type=float,default=1,required=False,help="maximum wavelength")
+    parser.add_argument("--dllam",type=float,default=1e-4,required=False,help="dlog-lambda")
     parser.add_argument("--arclines",type=str,default=None,required=True,help="file with the list of lines in arc lamp")
     parser.add_argument("--skylines",type=str,default=None,required=False,help="file with the list of sky lines")
     parser.add_argument("--wdisp",type=str,default=None,required=False,help="file with the wdisp")
@@ -42,11 +42,8 @@ if __name__=="__main__":
 
 
     ## wavelength:
-    wave_new = wave[249,:]
-#    nbins = int((args.lambda_max - args.lambda_min)/args.dlam)
-#    wave_new = args.lambda_min+np.arange(nbins)*args.dlam
-    w=(wave_new>args.lambda_min) & (wave_new<args.lambda_max)
-    wave_new = wave_new[w]
+    nbins = int(sp.log10(args.lambda_max/args.lambda_min)/args.dllam)
+    wave_new = args.lambda_min*10**(sp.arange(nbins)*args.dllam)
     ## wdisp
     #wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
 

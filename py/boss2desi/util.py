@@ -95,7 +95,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
                 sys.stderr.write("chi2: {}, ndf: {} ".format(chi2,ndf))
                 pp.figure(1)
                 pp.plot(wave[fib,a],b)
-                pp.plot(wave[fib,:],flux[fib,:])
+                pp.plot(wave[fib,:],flux[fib,:]*(ivar[fib,:]>0))
                 pp.grid()
                 for l in to:
                     pp.plot(l+sp.zeros(2),flux[fib,:].max()*sp.arange(2),"k--")
@@ -161,7 +161,7 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     w=dlam<tol
     i0=index[w]
     f0=flux[w]
-    eta=0.
+    eta=0.0
     iv=ivar[w]/((eta*f0)**2*ivar[w]+1)
 
     def sigma(p):
@@ -188,7 +188,7 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
         s = sigma(sp.array(p[:deg+1]))
         bb = broadband(p[deg+1:])
         res = peaks(s,f0-bb,dpix=p[-1])+bb
-        ret = (iv*(f0-res)**2).sum()
+        ret = (iv*(f0-bb-res)**2).sum()
         return ret
     pinit={}
     if p0 is None:

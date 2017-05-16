@@ -49,6 +49,7 @@ class brick:
             ilines=sp.zeros([wave.shape[0],w.sum()])
             for fib in range(nspec):
                 ilines[fib]=interp1d(wave[fib],index)(to[w])
+            print "fitting Sky"
             i0,_,_,_=util.fitSkyLinesGlobally(fl,iv,ilines,deg_epsilon=4)
 
         for fib in fibers:
@@ -59,14 +60,15 @@ class brick:
             res/=norm[:,None]
 
             w = iv[fib,:]>0
-            if w.sum()==0:
-                re.append(sp.zeros([2,nbins]))
+            if (w & wlam).sum()==0:
+                re.append(sp.zeros([3,nbins]))
                 continue
             ## check that the centers of the resolution are at less than 
             ## half a pixel of a good pixel
 
             centers = i_wave(wave_new)
-            wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<0.51
+            wgood = abs(centers-i0[fib,wlam & w,None]).min(axis=0)<1
+
             mask[fib,~wgood]=1
             if wgood.sum()==0:
                 re.append(sp.zeros([2,nbins]))

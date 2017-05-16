@@ -492,7 +492,6 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
             for i,w in enumerate(wall):
                 fit=peak(ep[fib]+(1+et[fib])*index[w],il[i],sigma,flux[fib,w],ivar[fib,w])
                 chi += ((flux[fib,w]-fit)**2*ivar[fib,w]).sum()
-
         return chi
 
     nep=deg_epsilon+1
@@ -508,6 +507,9 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         kwds[p]=0.
         kwds["error_"+p]=0.01
         kwds["limit_"+p]=(-2,2)
+
+    for i in range(net):
+        kwds["fix_a{}_et".format(i)]=True
 
     kwds["sigma"]=1.
     kwds["error_sigma"]=0.1

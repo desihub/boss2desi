@@ -52,6 +52,7 @@ class brick:
             print "fitting Sky"
             i0,_,_,_=util.fitSkyLinesGlobally(fl,iv,ilines,deg_epsilon=4)
 
+        self.i0 = i0
         for fib in fibers:
             i_wave = interp1d(wave[fib,:],index)
             wlam = (wave[fib,:]>wave_new.min()) & (wave[fib]<wave_new.max())

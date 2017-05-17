@@ -428,39 +428,52 @@ def fitSkyLines(flux,ivar,ilines,tol=10):
     i = line_shift(index,epsilon,eta)
     return i,epsilon,eta
 
-def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None):
+def fitSkyLinesGlobally(fibers,flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None,lam=1.):
     '''
     fit shift and dilation parameters to fix drifts in the wavelength solution from the arc
     assume shift, dilatation and sigma are quadratic with fiber number
     '''
     
-    fibers = sp.arange(flux.shape[0])
     index = sp.arange(flux.shape[1])
+    '''
     ## works for 500 fibers and degree 2
-    nodes_eps = fibers[0]+(fibers[-1]-fibers[0])*sp.arange(deg_epsilon+1,dtype=float)/(deg_epsilon-1)
+    nodes_eps = fibers[0]+(fibers[-1]-fibers[0])*sp.arange(deg_epsilon+1,dtype=float)/deg_epsilon
     pol_ep = sp.ones([deg_epsilon+1,len(fibers)])
     for i in range(deg_epsilon+1):
         for j in range(deg_epsilon+1):
             if j!=i:
                 pol_ep[i]*=(fibers-nodes_eps[j])/(nodes_eps[i]-nodes_eps[j])
-
+    '''
+    pol_ep = sp.ones([deg_epsilon+1,len(fibers)])
+    for i in range(1,deg_epsilon+1):
+        pol_ep[i]=(fibers*1./fibers.max())**i
     def epsilon(p):
+        
+        ep = (sp.array(p)[:,None]*pol_ep).sum(axis=0)
         return (sp.array(p)[:,None]*pol_ep).sum(axis=0)
-
+        
+        '''
+        ep=p[0]*pol_ep[0]
+        for i in range(1,deg_epsilon+1):
+            ep+=p[i]*pol_ep[i]
+        print p, ep.mean()
+        return ep
+        '''
+    
     ## works for 500 fibers and degree 1
     def eta(fib,p):
         et=p[0]*(499.-fib)/499.
         et+=p[1]*fib/499.
 
-        return et
+        return 1e-5*et
     
     ## fit constant and amplitude for a given peak
     def peak(x,i0,sigma,fl,iv):
         f = sp.exp(-(x-i0)**2/2/sigma**2)
         xbar = (iv*f).sum()
-        x2bar = (iv*f**2).sum()
+        x2bar = (iv*(f-xbar)**2).sum()
         dbar = (iv*fl).sum()
-        dxbar= (iv*fl*f).sum()
+        dxbar= (iv*fl*(f-xbar)).sum()
         M = sp.zeros([2,2])
         C = sp.zeros(2)
         M[0,0]=iv.sum()
@@ -473,12 +486,12 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         try:
             C = linalg.inv(M).dot(C)
         except:
-            return fl*0
+            return None
         A = C[0]
         B = C[1]
-        fit = A+B*f
+        fit = A+B*(f-xbar)
         return fit
-
+    
     def chi2(*p):
         p_ep = p[0:nep]
         p_et = p[nep:nep+net]
@@ -486,12 +499,18 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
         ep = epsilon(p_ep)
         et = eta(fibers,p_et)
         chi=0
-        for fib in fibers:
+        ndata=0
+        for ifib,fib in enumerate(fibers):
             il = ilines[fib]
             wall = abs(index-il[:,None])<tol
             for i,w in enumerate(wall):
-                fit=peak(ep[fib]+(1+et[fib])*index[w],il[i],sigma,flux[fib,w],ivar[fib,w])
-                chi += ((flux[fib,w]-fit)**2*ivar[fib,w]).sum()
+                ndata+=w.sum()
+                fit=peak(ep[ifib]+(1+et[ifib])*index[w],il[i],sigma,flux[ifib,w],ivar[ifib,w])
+                if fit is None:
+                    continue
+                chi += ((flux[ifib,w]-fit)**2*ivar[ifib,w]).sum()
+        chi/=2*ndata
+        chi+=lam*(sp.array(p)**2).sum()
         return chi
 
     nep=deg_epsilon+1
@@ -505,8 +524,8 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
     kwds={}
     for p in pars:
         kwds[p]=0.
-        kwds["error_"+p]=0.01
-        kwds["limit_"+p]=(-2,2)
+        kwds["error_"+p]=0.1
+#        kwds["limit_"+p]=(-2,2)
 
     for i in range(net):
         kwds["fix_a{}_et".format(i)]=True
@@ -524,12 +543,12 @@ def fitSkyLinesGlobally(flux,ivar,ilines,tol=10,deg_epsilon=2,deg_eta=1,log=None
 
     peaks = sp.zeros(flux.shape)
     index = ep[:,None]+(1+et[:,None])*index
-    for fib in fibers:
+    for ifib,fib in enumerate(fibers):
         il = ilines[fib]
-        wall = abs(index[fib]-il[:,None])<tol
+        wall = abs(index[ifib]-il[:,None])<tol
         for i,w in enumerate(wall):
             i0=ilines[fib,i]
-            peaks[fib,w]=peak(index[fib,w],i0,sigma,flux[fib,w],ivar[fib,w])
+            peaks[ifib,w]=peak(index[ifib,w],i0,sigma,flux[ifib,w],ivar[ifib,w])
 
     return index,ep,et,peaks
 

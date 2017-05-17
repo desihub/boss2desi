@@ -50,7 +50,7 @@ class brick:
             for fib in range(nspec):
                 ilines[fib]=interp1d(wave[fib],index)(to[w])
             print "fitting Sky"
-            i0,_,_,_=util.fitSkyLinesGlobally(fl,iv,ilines,deg_epsilon=4)
+            i0,_,_,_=util.fitSkyLinesGlobally(fibers,fl,iv,ilines,deg_epsilon=4,lam=0.01)
 
         self.i0 = i0
         for fib in fibers:

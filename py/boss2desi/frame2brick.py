@@ -37,7 +37,9 @@ class brick:
 
         index = sp.arange(wave.shape[1])
         if fibers==None:
-            fibers=range(nspec)
+            fibers=sp.arange(nspec)
+        else:
+            fibers=sp.array(fibers)
 
         i0 = sp.zeros(wave.shape)
         for i in range(nspec):
@@ -50,7 +52,7 @@ class brick:
             for fib in range(nspec):
                 ilines[fib]=interp1d(wave[fib],index)(to[w])
             print "fitting Sky"
-            i0,_,_,_=util.fitSkyLinesGlobally(fibers,fl,iv,ilines,deg_epsilon=4,lam=0.01)
+            i0,_,_,_=util.fitSkyLinesGlobally(fibers,fl[fibers],iv[fibers],ilines,deg_epsilon=2,lam=0.01)
 
         self.i0 = i0
         for fib in fibers:

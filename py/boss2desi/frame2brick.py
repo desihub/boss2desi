@@ -27,7 +27,7 @@ class brick:
         flux = sp.zeros([nspec,nbins])
         ivar = sp.zeros([nspec,nbins])
         mask = sp.zeros([nspec,nbins],dtype=sp.uint32)
-        re = []
+        re = [[]]*nspec
 
         self.fm = None
         if fibermap is not None:
@@ -52,7 +52,7 @@ class brick:
             for fib in range(nspec):
                 ilines[fib]=interp1d(wave[fib],index)(to[w])
             print "fitting Sky"
-            i0,_,_,_=util.fitSkyLinesGlobally(fibers,fl[fibers],iv[fibers],ilines,deg_epsilon=2,lam=0.01)
+            i0,_,_,_=util.fitSkyLinesGlobally(sp.arange(nspec),fl,iv,ilines,deg_epsilon=2,lam=0.01)
 
         self.i0 = i0
         for fib in fibers:
@@ -64,7 +64,7 @@ class brick:
 
             w = iv[fib,:]>0
             if (w & wlam).sum()==0:
-                re.append(sp.zeros([3,nbins]))
+                re[fib]= sp.zeros([1,nbins])
                 continue
             ## check that the centers of the resolution are at less than 
             ## half a pixel of a good pixel
@@ -74,7 +74,7 @@ class brick:
 
             mask[fib,~wgood]=1
             if wgood.sum()==0:
-                re.append(sp.zeros([2,nbins]))
+                re[fib]=sp.zeros([1,nbins])
                 continue
 
             #f,i,r = util.svd_spectro_perf(fl[fib,wlam],iv[fib,wlam],res[wgood,:],log=log)
@@ -89,7 +89,7 @@ class brick:
             except:
                 if log is not None:
                     log.write("svd failed in fib {}\n".format(fib))
-                re.append(sp.zeros([3,nbins]))
+                re[fib] = sp.zeros([1,nbins])
                 continue
             flux[fib]=f
             ivar[fib]=i
@@ -133,17 +133,13 @@ class brick:
 
             ######################
 
-            re.append(reso)
+            re[fib] = reso
 
-        ndiags = sp.array([r.shape[0] for r in re])
-        w = ivar.sum(axis=1)>0
-        try:
-            ndiag = max(ndiags[w])
-        except:
-            ndiag = max(ndiags)
+        ndiags = sp.array([r.shape[0] for r in re if isinstance(r,sp.ndarray)])
+        ndiag = max(ndiags)
         sys.stdout.write("max in diag {} in fiber {}\n".format(ndiag,sp.argmax(ndiags)))
         self.re = sp.zeros([nspec,ndiag,nbins])
-        for fib in range(len(re)):
+        for fib in fibers:
             nd = re[fib].shape[0]
             self.re[fib,(ndiag-nd)/2:(ndiag+nd)/2]=re[fib]
 

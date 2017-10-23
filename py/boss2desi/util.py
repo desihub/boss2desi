@@ -10,7 +10,7 @@ from matplotlib import pyplot as pp
 import iminuit
 import traceback
 
-def resolution(i,i0,sigma,dpix=sp.sqrt(2)):
+def resolution(i,i0,sigma,dpix=0.5):
     ## This is the resolution in pixel units
     ## integrate the gaussian over 1 pixel
     res = (erf((i-i0+dpix)/sigma/sp.sqrt(2)) - erf((i-i0-dpix)/sigma/sp.sqrt(2)))*0.5*sigma
@@ -161,7 +161,7 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     w=dlam<tol
     i0=index[w]
     f0=flux[w]
-    eta=0.0
+    eta=0.01
     iv=ivar[w]/((eta*f0)**2*ivar[w]+1)
 
     def sigma(p):
@@ -211,6 +211,7 @@ def fitDisp(flux,ivar,ilines,tol=10,deg=2,log=None,p0=None,deg_bb=3):
     kwds["dpix"]=0.5
     kwds["error_dpix"]=0.1*sp.sqrt(2)
     kwds["limit_dpix"]=(0.,3)
+    kwds["fix_dpix"]=True
 
     mig = iminuit.Minuit(chi2,forced_parameters=pnames,errordef=1,print_level=0,**kwds)
     t0 = time.time()

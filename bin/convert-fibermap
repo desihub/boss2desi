@@ -4,6 +4,7 @@ from boss2desi.fibermap import boss_fibermap
 import fitsio
 import argparse
 import re
+from os.path import dirname
 
 
 if __name__=="__main__":
@@ -11,12 +12,14 @@ if __name__=="__main__":
     
     parser.add_argument("--cframe",type=str,default=None,required=True,help="cframe")
     parser.add_argument("--spall",type=str,default=None,required=True,help="spAll file to read thing_ids")
-    parser.add_argument("--out",type=str,default=None,required=True,help="output file")
+    parser.add_argument("--out-dir",type=str,default=None,required=True,help="output directory")
     args=parser.parse_args()
 
     cframe1=fitsio.FITS(re.sub('-..-','-b1-',args.cframe))
     camera1 = cframe1[0].read_header()["CAMERAS"].strip()
     exposure1 = str(cframe1[0].read_header()["EXPOSURE"])
+    while len(exposure1)<8:
+        exposure1 = '0'+exposure1
 
     cframe2=fitsio.FITS(re.sub('-..-','-b2-',args.cframe))
     camera2 = cframe2[0].read_header()["CAMERAS"].strip()
@@ -41,7 +44,7 @@ if __name__=="__main__":
 
     fm = fm1+fm2
 
-    fm.export(args.out)
+    fm.export((args.out_dir+"/fibermap-{}.fits").format(exposure1))
 
 
     

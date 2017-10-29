@@ -1,78 +1,51 @@
 #!/usr/bin/env python
-
-import sys
-from boss2desi import frame2brick
-import fitsio
+from __future__ import print_function
 import argparse
-from boss2desi import util
-import scipy as sp
-from scipy.interpolate import interp1d
+import numpy as np
 
+from boss2desi import io,fibermap
+from boss2desi.frame import resample
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
-    parser.add_argument("--frame",type=str,default=None,required=True,help="frame file")
-    parser.add_argument("--cframe",type=str,default=None,required=True,help="cframe file. Required to read the wavelength solution of the frame.")
-    parser.add_argument("--arc",type=str,default=None,required=True,help="determine wdisp from this file instead of cframe")
-    parser.add_argument("--lambda-min",type=float,default=3500,required=False,help="minimum wavelength")
-    parser.add_argument("--lambda-max",type=float,default=6500,required=False,help="maximum wavelength")
-    parser.add_argument("--dllam",type=float,default=1e-4,required=False,help="dlog-lambda")
-    parser.add_argument("--arclines",type=str,default=None,required=True,help="file with the list of lines in arc lamp")
-    parser.add_argument("--skylines",type=str,default=None,required=False,help="file with the list of sky lines")
-    parser.add_argument("--wdisp",type=str,default=None,required=False,help="file with the wdisp")
-    
-    parser.add_argument("--out",type=str,default=None,required=True,help="output file")
-    parser.add_argument("--log",type=str,default=None,required=False,help="log file")
-    parser.add_argument("--wdisp-deg",type=int,default=4,required=False,help="degree of polynomial for evolution of wdisp with wavelength")
-    parser.add_argument("--wdisp-deg-bb",type=int,default=4,required=False,help="degree of polynomial for evolution of wdisp broadband with wavelength")
+    parser.add_argument("--spplate",type=str,default=None,required=True,help="spplate file")
+    parser.add_argument("--fibers",type=int,default=None,required=False,help="list of fibers",nargs="*")
+    parser.add_argument("--outdir",type=str,default=None,required=True,help="output directory")
+    parser.add_argument("--ncpu",type=int,default=None,required=False,help="number of cpus")
+    parser.add_argument("--flat-dir",type=str,default=None,required=False,help="flat extractions dir")
 
-    args=parser.parse_args()
+    args = parser.parse_args()
 
-    frame=fitsio.FITS(args.frame)
-    flux = frame[0].read()
-    ivar = frame[1].read()
-    mask = frame[2].read()
-    wave = 10**frame[3].read()
+    frames = io.get_frames(args.spplate,fibers=args.fibers,flatdir=args.flat_dir)
 
-    ## read wdisp and wavelenghts and wdisp from cframe
-    cframe=fitsio.FITS(args.cframe)
-    fibermap = cframe[5]
-    camera = cframe[0].read_header()["CAMERAS"]
+    ## get the wavelength from the first exposure and the central fiber
+    llmin_b = 3600.
+    llmax_b = 6200.
+    ref_fiber_index = 249
+    wave_new = {}
+    for frame in frames:
+        if frame.camera[0]=="b":    
+            wave_new["b"] = frame.spectra[ref_fiber_index].wave
+            w = (wave_new["b"]>llmin_b) & (wave_new["b"] < llmax_b)
+            wave_new["b"] = wave_new["b"][w]
+            break
+    llmin_r = 6000.
+    llmax_r = 10000.
+    for frame in frames:
+        if frame.camera[0]=="r":
+            wave_new["r"] = frame.spectra[0].wave
+            w = (wave_new["r"]>llmin_r) & (wave_new["r"] < llmax_r)
+            wave_new["r"] = wave_new["r"][w]
+            break
 
+    wdisp_max = [s.wdisp.max() for frame in frames for s in frame.spectra]
+    wdisp_max = max(wdisp_max)
+    ndiag = int(4*np.ceil(wdisp_max)+1)
+    print("INFO: setting ndiag to : {}".format(ndiag))
 
-    ## wavelength:
-    nbins = int(sp.log10(args.lambda_max/args.lambda_min)/args.dllam)
-    wave_new = args.lambda_min*10**(sp.arange(nbins)*args.dllam)
-    ## wdisp
-    #wave_wdisp,wdisp,_,_ = util.fitArc(args.arc,camera,lambda_out=wave_new)
+    header, colnames, fibermap = fibermap.desi_fibermap(args.spplate)
+    for frame in frames:
+        resampled_frame = resample(frame,wave_new[frame.camera[0]],ndiag,ncpu = args.ncpu)
+        io.export_frame(resampled_frame,header,fibermap,colnames,args.outdir)
 
-    log=None
-    if args.log is not None:
-        log = open(args.log,"w")
-
-    if args.wdisp is None:
-        wdisp,ok,dpix = util.newFitArc(args.arc,wave_new,args.arclines,log=log,deg=args.wdisp_deg,deg_bb=args.wdisp_deg_bb)
-    else:
-        f=open(args.wdisp)
-        ok=f.readline()
-        ok=ok.split()
-        ok = [int(o)==1 for o in ok]
-        ok = sp.array(ok)
-        to=sp.loadtxt(args.wdisp,skiprows=1)
-        wd=to[:,1:].T
-        wdisp = sp.zeros((wd.shape[0],len(wave_new)))
-        for i in range(wd.shape[0]):
-            wdisp[i,:] = interp1d(to[:,0],wd[i,:])(wave_new)
-
-
-    ivar[~ok,:]=0.
-    ## The arc and the frame have the same wavelength solution
-    b=frame2brick.brick(flux,ivar,mask,wave,wave_new,wdisp,dpix,camera,fibermap,skylines=args.skylines,log=log)
-
-    if log is not None:
-        log.close()
-    b.export(args.out)
-
-
-    

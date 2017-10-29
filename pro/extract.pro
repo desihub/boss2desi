@@ -4,13 +4,10 @@ pro extract, inname,arcname,flatname,plugfile,outname,mjd=mjd,plate=plate,final_
 ; [transpose(lambda), xpeak], arcinfofile
 
 
-run2d='v5_9_0'
+run2d=getenv('RUN2D')
 print,"INFO reading arc ",arcname
 arcname=getenv('BOSS_SPECTRO_DATA')+'/../redux/'+run2d+'/'+plate+'/'+arcname
 print,arcname
-toto=mrdfits(arcname,1)
-lambda=transpose(toto[0,*])
-xpeak=toto[1:*,*]
 wset=mrdfits(arcname,2)
 traceset2xy, wset, ypixw, loglam
 
@@ -18,8 +15,6 @@ indir=getenv('BOSS_SPECTRO_DATA')+'/'+mjd
 
 print,"INFO reading flat ",flatname
 flatname=getenv('BOSS_SPECTRO_DATA')+'/../redux/'+run2d+'/'+plate+'/'+flatname
-print,flatname
-fflat=mrdfits(flatname,0)
 xset=mrdfits(flatname,1)
 traceset2xy, xset, ypix, xtrace
 
@@ -169,6 +164,9 @@ mwrfits, pixelmask, outname, hdrfloat
 sxaddpar, hdrfloat, 'BUNIT', 'log10(Angs)'
 sxaddpar, hdrfloat, 'EXTNAME', 'LOGLAM', ' log wavelength'
 mwrfits, loglam, outname, hdrfloat
+sxaddpar, hdrfloat, 'BUNIT', 'NODIM'
+sxaddpar, hdrfloat, 'EXTNAME', 'DISPERSION', ''
+mwrfits, sigma2, outname, hdrfloat
 sxaddpar, hdrfloat, 'BUNIT', 'NODIM'
 sxaddpar, hdrfloat, 'EXTNAME', 'CHI2PDF', ' chi2/ndf'
 mwrfits, chi2pdf, outname, hdrfloat

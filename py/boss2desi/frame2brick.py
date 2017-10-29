@@ -8,7 +8,7 @@ import fitsio
 import boss2desi.fibermap
 from boss2desi import util
 
-class brick:
+class spectra:
     def __init__(self,fl,iv,ma,wave,wave_new,wdisp,dpix,camera,fibermap,skylines=None,log=None,fibers=None,tol=1e-3,ndiag_max=27):
 
         self.camera = camera

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import numpy as np
 import fitsio
@@ -80,7 +81,7 @@ def newFitArc(arcfile,wave_new,arclines,fiber=None,debug=False,out=None,log=None
             sys.stderr.write("fitDisp\n")
             wd,a,b,pars,chi2,ndf,dpix[fib] = fitDisp(flux[fib,:],ivar[fib,:],i(to[w]),deg=deg,log=log,deg_bb=deg_bb,tol=tol)
             sys.stderr.write("fit Disp done in {}".format(time.time()-t0))
-            print "fit Disp in ",time.time()-t0
+            print("fit Disp in ",time.time()-t0)
 
             wd = interp1d(wave[fib,:],wd,bounds_error=False,fill_value=wd.mean())
             wdisp[fib,:] = wd(wave_new)
@@ -262,7 +263,7 @@ def fitArcLines(flux,ilines,tol=10,log=None,p0=None,ivar=None):
         s = sigma(p)
         res = peaks(s)
         ret = (iv*(f0-res)**2).sum()
-        print sp.mean(s),ret
+        print(sp.mean(s),ret)
         return ret
 
     pinit={}
